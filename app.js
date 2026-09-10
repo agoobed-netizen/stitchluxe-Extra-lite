@@ -1,14 +1,24 @@
 /* =============================================================
-   StitchLuxe Extra Lite — app.js
-   Vanilla ES6+ • Supabase JS SDK v2 (with localStorage fallback)
+   StitchLuxe Extra Lite — app.js  (bulletproof v2.2)
+   - Global error boundary
+   - Auto-fallback to LOCAL mode on any Supabase structural error
+   - Never lets the app get stuck on login
    ============================================================= */
 
-/* ---------------- CONFIG ---------------- */
+/* ---------- GLOBAL ERROR BOUNDARY (runs before anything else) ---------- */
+window.addEventListener('error', (e) => {
+  console.error('[GLOBAL ERROR]', e.message, '@', e.filename, ':', e.lineno, ':', e.colno);
+});
+window.addEventListener('unhandledrejection', (e) => {
+  console.error('[UNHANDLED PROMISE]', e.reason);
+});
+
+/* ---------- CONFIG ---------- */
 const CONFIG = {
-  SUPABASE_URL:      window.STITCHLUXE_SUPABASE_URL      || '',      // e.g. https://xxxx.supabase.co
-  SUPABASE_ANON_KEY: window.STITCHLUXE_SUPABASE_ANON_KEY || '',      // anon public key
-  PAYSTACK_PUBLIC_KEY: window.STITCHLUXE_PAYSTACK_KEY    || 'pk_test_xxAxxxxxxxxxxxxxxxxxxxxxx',
-  LS_KEY: 'stitchluxe_extra_lite_v1',
+  SUPABASE_URL:        window.STITCHLUXE_SUPABASE_URL      || '',
+  SUPABASE_ANON_KEY:   window.STITCHLUXE_SUPABASE_ANON_KEY || '',
+  PAYSTACK_PUBLIC_KEY: window.STITCHLUXE_PAYSTACK_KEY      || '',
+  LS_KEY:     'stitchluxe_extra_lite_v1',
   LS_SESSION: 'stitchluxe_session_v1'
 };
 
@@ -21,33 +31,38 @@ const MILESTONES = [
   'Final Delivery'
 ];
 
-/* ---------------- STATE ---------------- */
 const state = {
   user: null,
   orders: [],
   listings: [],
   applications: [],
   payments: [],
-  messages: {},          // orderId -> [msgs]
+  messages: {},
   activeOrderId: null,
   activeTab: 'orders'
 };
 
-/* ---------------- UTIL ---------------- */
+/* ---------- UTIL ---------- */
 const $ = (id) => document.getElementById(id);
 const uid = () => 'id-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 const money = (n) => '₦' + Number(n || 0).toLocaleString('en-NG');
-const escapeHtml = (s='') => s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const escapeHtml = (s='') => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const initials = (name='') => {
-  const parts = name.trim().split(/\s+/);
-  if (!parts.length || !parts[0]) return '?';
+  const parts = String(name).trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return '?';
   return (parts[0][0] + (parts[1]?.[0] || '')).toUpperCase();
 };
 const fmtDate = (ts) => new Date(ts).toLocaleDateString('en-NG', { month:'short', day:'numeric', year:'numeric' });
 
 function toast(msg, type='info') {
   const wrap = $('toast-wrap');
-  const colors = { info:'bg-black text-white', success:'bg-green-600 text-white', error:'bg-red-600 text-white', warn:'bg-[#c9a227] text-black' };
+  if (!wrap) return;
+  const colors = {
+    info:    'bg-black text-white',
+    success: 'bg-green-600 text-white',
+    error:   'bg-red-600 text-white',
+    warn:    'bg-[#c9a227] text-black'
+  };
   const el = document.createElement('div');
   el.className = `toast ${colors[type]} text-sm font-medium px-4 py-3 rounded-xl shadow-lg max-w-xs`;
   el.textContent = msg;
@@ -55,46 +70,65 @@ function toast(msg, type='info') {
   setTimeout(() => el.remove(), 3500);
 }
 
-/* =============================================================
-   DB ADAPTER — Supabase if configured, else localStorage
-   ============================================================= */
+/* ---------- SAFE LOCALSTORAGE ---------- */
+function lsRead(key, fallback) {
+  try { return JSON.parse(localStorage.getItem(key)) ?? fallback; }
+  catch { return fallback; }
+}
+function lsWrite(key, val) {
+  try { localStorage.setItem(key, JSON.stringify(val)); return true; }
+  catch (e) { console.warn('[StitchLuxe] localStorage write failed:', e.name); return false; }
+}
+
+/* ---------- SUPABASE CLIENT (with self-heal) ---------- */
 let sb = null;
 let useLocal = true;
+
+function supabaseReady() {
+  return !useLocal
+    && sb
+    && sb.auth
+    && typeof sb.auth.signUp === 'function'
+    && typeof sb.auth.signInWithPassword === 'function';
+}
+
+function forceLocalMode(reason) {
+  if (!useLocal) console.warn('[StitchLuxe] Switching to LOCAL mode:', reason);
+  useLocal = true;
+  sb = null;
+}
 
 if (CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY && window.supabase) {
   try {
     sb = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
-
-    // Verify the client actually has the .auth methods we need.
-    // If not, treat it as broken and fall back to local storage so the
-    // app never gets stuck in a half-initialised state.
     if (sb && sb.auth && typeof sb.auth.signUp === 'function' && typeof sb.auth.signInWithPassword === 'function') {
       useLocal = false;
       console.log('[StitchLuxe] Supabase client OK — connected to real backend');
     } else {
       console.warn('[StitchLuxe] Supabase client missing .auth — falling back to LOCAL mode');
-      sb = null;
-      useLocal = true;
+      sb = null; useLocal = true;
     }
   } catch (e) {
-    console.warn('[StitchLuxe] Supabase init failed, using local fallback', e);
-    sb = null;
-    useLocal = true;
+    console.warn('[StitchLuxe] Supabase init threw:', e);
+    sb = null; useLocal = true;
   }
 }
 
-/* ---- LocalStorage helpers ---- */
-function lsRead(key, fallback) {
-  try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; }
+/* Detect "the library broke" vs "the user typed wrong password" */
+function isStructuralError(e) {
+  const msg = String(e?.message || e || '');
+  return msg.includes('Cannot read properties')
+      || msg.includes('is not a function')
+      || msg.includes('undefined')
+      || msg.includes('Failed to fetch')
+      || msg.includes('NetworkError');
 }
-function lsWrite(key, val) { localStorage.setItem(key, JSON.stringify(val)); }
 
-/* Seed demo data on first load for local mode */
+/* ---------- LOCAL SEED ---------- */
 function seedLocal() {
   const db = lsRead(CONFIG.LS_KEY, null);
   if (db) return db;
   const seed = { orders: [], listings: [], applications: [], payments: [], messages: {}, profiles: {} };
-  // seed demo tailor profile
   seed.profiles['mastertailor@stitchluxe.com'] = {
     id: 'tailor-demo-001', email: 'mastertailor@stitchluxe.com',
     full_name: 'Master Ade Tailor', role: 'tailor'
@@ -107,88 +141,155 @@ function seedLocal() {
   return seed;
 }
 
-/* ---- Unified DB API ---- */
+/* =============================================================
+   UNIFIED DB ADAPTER
+   Every Supabase call is wrapped so structural failures
+   self-heal into LOCAL mode and retry transparently.
+   ============================================================= */
 const db = {
-  /* AUTH */
+
   async signIn(email, password, role) {
-    if (!useLocal) {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) throw error;
-      const { data: profile } = await supabase.from('profiles').select('*').eq('id', data.user.id).single();
-      return { user: data.user, profile: profile || { id:data.user.id, email, full_name:email, role } };
+    if (supabaseReady()) {
+      try {
+        const { data, error } = await sb.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+        let profile = null;
+        try {
+          const { data: p } = await sb.from('profiles').select('*').eq('id', data.user.id).single();
+          profile = p;
+        } catch {}
+        return { user: data.user, profile: profile || { id: data.user.id, email, full_name: email, role } };
+      } catch (e) {
+        if (isStructuralError(e)) {
+          forceLocalMode('signIn: ' + e.message);
+        } else {
+          throw e;
+        }
+      }
     }
-    // local auth
     const store = seedLocal();
-    const profile = store.profiles[email];
+    let profile = store.profiles[email];
     if (!profile) {
-      // auto-create local profile
-      const newProfile = { id: uid(), email, full_name: email.split('@')[0], role: role || 'client' };
-      store.profiles[email] = newProfile; lsWrite(CONFIG.LS_KEY, store);
-      return { user: { id: newProfile.id, email }, profile: newProfile };
+      profile = { id: uid(), email, full_name: email.split('@')[0], role: role || 'client' };
+      store.profiles[email] = profile;
+      lsWrite(CONFIG.LS_KEY, store);
     }
     return { user: { id: profile.id, email }, profile };
   },
+
   async signUp(email, password, fullName, role) {
-    if (!useLocal) {
-      const { data, error } = await supabase.auth.signUp({
-        email, password,
-        options: { data: { full_name: fullName, role } }
-      });
-      if (error) throw error;
-      return { user: data.user, profile: { id: data.user.id, email, full_name: fullName, role } };
+    if (supabaseReady()) {
+      try {
+        const { data, error } = await sb.auth.signUp({
+          email, password,
+          options: { data: { full_name: fullName, role } }
+        });
+        if (error) throw error;
+        return { user: data.user, profile: { id: data.user?.id, email, full_name: fullName, role } };
+      } catch (e) {
+        if (isStructuralError(e)) {
+          forceLocalMode('signUp: ' + e.message);
+        } else {
+          throw e;
+        }
+      }
     }
     const store = seedLocal();
     const profile = { id: uid(), email, full_name: fullName, role: role || 'client' };
-    store.profiles[email] = profile; lsWrite(CONFIG.LS_KEY, store);
+    store.profiles[email] = profile;
+    lsWrite(CONFIG.LS_KEY, store);
     return { user: { id: profile.id, email }, profile };
   },
+
   async signOut() {
-    if (!useLocal && supabase) await supabase.auth.signOut();
-    localStorage.removeItem(CONFIG.LS_SESSION);
+    if (supabaseReady()) {
+      try { await sb.auth.signOut(); } catch (e) { console.warn('[StitchLuxe] signOut error:', e); }
+    }
+    try { localStorage.removeItem(CONFIG.LS_SESSION); } catch {}
   },
 
-  /* ORDERS */
   async listOrders() {
-    if (!useLocal) {
-      const { data, error } = await supabase.from('bespoke_orders').select('*').order('created_at', { ascending:false });
-      if (error) throw error; return data || [];
+    if (supabaseReady()) {
+      try {
+        const { data, error } = await sb.from('bespoke_orders').select('*').order('created_at', { ascending:false });
+        if (error) throw error;
+        return data || [];
+      } catch (e) {
+        if (isStructuralError(e)) forceLocalMode('listOrders');
+        else throw e;
+      }
     }
     const store = seedLocal();
-    return (store.orders || []).filter(o => o.client_id === state.user.id || o.tailor_id === state.user.id || !o.tailor_id);
+    return (store.orders || []).filter(o =>
+      o.client_id === state.user?.id || o.tailor_id === state.user?.id || !o.tailor_id);
   },
+
   async createOrder(payload) {
-    if (!useLocal) {
-      const { data, error } = await supabase.from('bespoke_orders').insert(payload).select().single();
-      if (error) throw error; return data;
+    if (supabaseReady()) {
+      try {
+        const { data, error } = await sb.from('bespoke_orders').insert(payload).select().single();
+        if (error) throw error;
+        return data;
+      } catch (e) {
+        if (isStructuralError(e)) forceLocalMode('createOrder');
+        else throw e;
+      }
     }
     const store = seedLocal();
-    const row = { id: uid(), created_at: Date.now(), updated_at: Date.now(), milestone: 1, status: 'pending', ...payload };
-    store.orders.push(row); lsWrite(CONFIG.LS_KEY, store);
+    const row = { id: uid(), created_at: Date.now(), updated_at: Date.now(), milestone: 1, status:'pending', ...payload };
+    store.orders.push(row);
+    lsWrite(CONFIG.LS_KEY, store);
     return row;
   },
+
   async updateOrder(id, patch) {
-    if (!useLocal) {
-      const { data, error } = await supabase.from('bespoke_orders').update({ ...patch, updated_at: new Date().toISOString() }).eq('id', id).select().single();
-      if (error) throw error; return data;
+    if (supabaseReady()) {
+      try {
+        const { data, error } = await sb.from('bespoke_orders')
+          .update({ ...patch, updated_at: new Date().toISOString() })
+          .eq('id', id).select().single();
+        if (error) throw error;
+        return data;
+      } catch (e) {
+        if (isStructuralError(e)) forceLocalMode('updateOrder');
+        else throw e;
+      }
     }
     const store = seedLocal();
     const idx = store.orders.findIndex(o => o.id === id);
-    if (idx >= 0) { store.orders[idx] = { ...store.orders[idx], ...patch, updated_at: Date.now() }; lsWrite(CONFIG.LS_KEY, store); return store.orders[idx]; }
+    if (idx >= 0) {
+      store.orders[idx] = { ...store.orders[idx], ...patch, updated_at: Date.now() };
+      lsWrite(CONFIG.LS_KEY, store);
+      return store.orders[idx];
+    }
   },
 
-  /* MESSAGES */
   async listMessages(orderId) {
-    if (!useLocal) {
-      const { data, error } = await supabase.from('order_messages').select('*').eq('order_id', orderId).order('created_at', { ascending:true });
-      if (error) throw error; return data || [];
+    if (supabaseReady()) {
+      try {
+        const { data, error } = await sb.from('order_messages').select('*')
+          .eq('order_id', orderId).order('created_at', { ascending:true });
+        if (error) throw error;
+        return data || [];
+      } catch (e) {
+        if (isStructuralError(e)) forceLocalMode('listMessages');
+        else throw e;
+      }
     }
     const store = seedLocal();
     return store.messages[orderId] || [];
   },
+
   async createMessage(payload) {
-    if (!useLocal) {
-      const { data, error } = await supabase.from('order_messages').insert(payload).select().single();
-      if (error) throw error; return data;
+    if (supabaseReady()) {
+      try {
+        const { data, error } = await sb.from('order_messages').insert(payload).select().single();
+        if (error) throw error;
+        return data;
+      } catch (e) {
+        if (isStructuralError(e)) forceLocalMode('createMessage');
+        else throw e;
+      }
     }
     const store = seedLocal();
     const row = { id: uid(), created_at: Date.now(), ...payload };
@@ -197,135 +298,237 @@ const db = {
     return row;
   },
 
-  /* PAYMENTS */
   async listPayments() {
-    if (!useLocal) {
-      const { data, error } = await supabase.from('payment_requests').select('*').order('created_at', { ascending:false });
-      if (error) throw error; return data || [];
+    if (supabaseReady()) {
+      try {
+        const { data, error } = await sb.from('payment_requests').select('*').order('created_at', { ascending:false });
+        if (error) throw error;
+        return data || [];
+      } catch (e) {
+        if (isStructuralError(e)) forceLocalMode('listPayments');
+        else throw e;
+      }
     }
     const store = seedLocal();
-    return (store.payments || []).filter(p => p.client_id === state.user.id || p.tailor_id === state.user.id);
+    return (store.payments || []).filter(p =>
+      p.client_id === state.user?.id || p.tailor_id === state.user?.id);
   },
+
   async createPayment(payload) {
-    if (!useLocal) {
-      const { data, error } = await supabase.from('payment_requests').insert(payload).select().single();
-      if (error) throw error; return data;
+    if (supabaseReady()) {
+      try {
+        const { data, error } = await sb.from('payment_requests').insert(payload).select().single();
+        if (error) throw error;
+        return data;
+      } catch (e) {
+        if (isStructuralError(e)) forceLocalMode('createPayment');
+        else throw e;
+      }
     }
     const store = seedLocal();
-    const row = { id: uid(), created_at: Date.now(), status: 'pending', ...payload };
-    store.payments.push(row); lsWrite(CONFIG.LS_KEY, store); return row;
+    const row = { id: uid(), created_at: Date.now(), status:'pending', ...payload };
+    store.payments.push(row);
+    lsWrite(CONFIG.LS_KEY, store);
+    return row;
   },
+
   async updatePayment(id, patch) {
-    if (!useLocal) {
-      const { data, error } = await supabase.from('payment_requests').update(patch).eq('id', id).select().single();
-      if (error) throw error; return data;
+    if (supabaseReady()) {
+      try {
+        const { data, error } = await sb.from('payment_requests').update(patch).eq('id', id).select().single();
+        if (error) throw error;
+        return data;
+      } catch (e) {
+        if (isStructuralError(e)) forceLocalMode('updatePayment');
+        else throw e;
+      }
     }
     const store = seedLocal();
     const idx = store.payments.findIndex(p => p.id === id);
-    if (idx >= 0) { store.payments[idx] = { ...store.payments[idx], ...patch }; lsWrite(CONFIG.LS_KEY, store); return store.payments[idx]; }
+    if (idx >= 0) {
+      store.payments[idx] = { ...store.payments[idx], ...patch };
+      lsWrite(CONFIG.LS_KEY, store);
+      return store.payments[idx];
+    }
   },
 
-  /* LISTINGS */
   async listListings() {
-    if (!useLocal) {
-      const { data, error } = await supabase.from('marketplace_listings').select('*').order('created_at', { ascending:false });
-      if (error) throw error; return data || [];
+    if (supabaseReady()) {
+      try {
+        const { data, error } = await sb.from('marketplace_listings').select('*').order('created_at', { ascending:false });
+        if (error) throw error;
+        return data || [];
+      } catch (e) {
+        if (isStructuralError(e)) forceLocalMode('listListings');
+        else throw e;
+      }
     }
     const store = seedLocal();
     return store.listings || [];
   },
+
   async createListing(payload) {
-    if (!useLocal) {
-      const { data, error } = await supabase.from('marketplace_listings').insert(payload).select().single();
-      if (error) throw error; return data;
+    if (supabaseReady()) {
+      try {
+        const { data, error } = await sb.from('marketplace_listings').insert(payload).select().single();
+        if (error) throw error;
+        return data;
+      } catch (e) {
+        if (isStructuralError(e)) forceLocalMode('createListing');
+        else throw e;
+      }
     }
     const store = seedLocal();
-    const row = { id: uid(), created_at: Date.now(), status: 'available', ...payload };
-    store.listings.push(row); lsWrite(CONFIG.LS_KEY, store); return row;
+    const row = { id: uid(), created_at: Date.now(), status:'available', ...payload };
+    store.listings.push(row);
+    lsWrite(CONFIG.LS_KEY, store);
+    return row;
   },
 
-  /* APPLICATIONS */
   async listApplications() {
-    if (!useLocal) {
-      const { data, error } = await supabase.from('apprentice_applications').select('*').order('created_at', { ascending:false });
-      if (error) throw error; return data || [];
+    if (supabaseReady()) {
+      try {
+        const { data, error } = await sb.from('apprentice_applications').select('*').order('created_at', { ascending:false });
+        if (error) throw error;
+        return data || [];
+      } catch (e) {
+        if (isStructuralError(e)) forceLocalMode('listApplications');
+        else throw e;
+      }
     }
     const store = seedLocal();
-    return (store.applications || []).filter(a => a.applicant_id === state.user.id || a.mentor_id === state.user.id);
+    return (store.applications || []).filter(a =>
+      a.applicant_id === state.user?.id || a.mentor_id === state.user?.id);
   },
+
   async createApplication(payload) {
-    if (!useLocal) {
-      const { data, error } = await supabase.from('apprentice_applications').insert(payload).select().single();
-      if (error) throw error; return data;
+    if (supabaseReady()) {
+      try {
+        const { data, error } = await sb.from('apprentice_applications').insert(payload).select().single();
+        if (error) throw error;
+        return data;
+      } catch (e) {
+        if (isStructuralError(e)) forceLocalMode('createApplication');
+        else throw e;
+      }
     }
     const store = seedLocal();
-    const row = { id: uid(), created_at: Date.now(), status: 'pending', ...payload };
-    store.applications.push(row); lsWrite(CONFIG.LS_KEY, store); return row;
+    const row = { id: uid(), created_at: Date.now(), status:'pending', ...payload };
+    store.applications.push(row);
+    lsWrite(CONFIG.LS_KEY, store);
+    return row;
   }
 };
 
 /* =============================================================
-   AUTH HANDLERS
+   AUTH UI HANDLERS
    ============================================================= */
 function showAuthError(msg) {
   const el = $('auth-error');
-  el.textContent = msg; el.classList.remove('hidden');
+  if (!el) return;
+  el.textContent = msg;
+  el.classList.remove('hidden');
 }
-function hideAuthError() { $('auth-error').classList.add('hidden'); }
+function hideAuthError() {
+  const el = $('auth-error');
+  if (el) el.classList.add('hidden');
+}
 
 async function handleLogin(e) {
-  e.preventDefault(); hideAuthError();
-  const email = $('auth-email').value.trim();
-  const password = $('auth-password').value;
-  const role = $('auth-role').value;
+  if (e && typeof e.preventDefault === 'function') e.preventDefault();
+  hideAuthError();
+
+  const email    = ($('auth-email')?.value || '').trim();
+  const password = $('auth-password')?.value || '';
+  const role     = $('auth-role')?.value || 'client';
+
+  console.log('[StitchLuxe] login attempt', { email, role, mode: useLocal ? 'LOCAL' : 'SUPABASE' });
+
+  if (!email)              return showAuthError('Please enter your email.');
   if (password.length < 6) return showAuthError('Password must be at least 6 characters.');
+
   try {
     const { user, profile } = await db.signIn(email, password, role);
-    startSession({ id: user.id, email, full_name: profile.full_name || email, role: profile.role || role });
+    console.log('[StitchLuxe] sign-in resolved', { user, profile });
+    startSession({
+      id:        user.id,
+      email,
+      full_name: profile?.full_name || email.split('@')[0],
+      role:      profile?.role || role
+    });
   } catch (err) {
-    showAuthError(err.message || 'Sign-in failed.');
+    console.error('[StitchLuxe] sign-in failed', err);
+    showAuthError(err?.message || 'Sign-in failed. Check your credentials.');
   }
 }
 
 async function handleSignup() {
   hideAuthError();
-  const name = $('auth-name').value.trim();
-  const email = $('auth-email').value.trim();
-  const password = $('auth-password').value;
-  const role = $('auth-role').value;
-  if (!name) return showAuthError('Please enter your full name to create an account.');
-  if (!email) return showAuthError('Please enter your email.');
+  const name     = ($('auth-name')?.value || '').trim();
+  const email    = ($('auth-email')?.value || '').trim();
+  const password = $('auth-password')?.value || '';
+  const role     = $('auth-role')?.value || 'client';
+
+  if (!name)               return showAuthError('Please enter your full name to create an account.');
+  if (!email)              return showAuthError('Please enter your email.');
   if (password.length < 6) return showAuthError('Password must be at least 6 characters.');
+
   try {
     const { user, profile } = await db.signUp(email, password, name, role);
-    startSession({ id: user.id, email, full_name: name, role });
-    toast('Account created. Welcome to StitchLuxe!', 'success');
-  } catch (err) { showAuthError(err.message || 'Signup failed.'); }
+    startSession({ id: user.id || 'local-' + Date.now(), email, full_name: name, role: profile?.role || role });
+    toast('Welcome to StitchLuxe!', 'success');
+  } catch (err) {
+    console.error('[StitchLuxe] signup failed', err);
+    showAuthError(err?.message || 'Signup failed. Try a different email.');
+  }
 }
 
 function handleDemo() {
-  $('auth-email').value = 'designer@stitchluxe.com';
-  $('auth-password').value = 'stitchluxe123';
-  $('auth-role').value = 'client';
-  handleLogin(new Event('submit'));
+  const e = $('auth-email'); if (e) e.value = 'designer@stitchluxe.com';
+  const p = $('auth-password'); if (p) p.value = 'stitchluxe123';
+  const r = $('auth-role'); if (r) r.value = 'client';
+  handleLogin();
 }
 
+/* =============================================================
+   SESSION START — UI first, storage second. Never stuck.
+   ============================================================= */
 function startSession(user) {
   state.user = user;
-  lsWrite(CONFIG.LS_SESSION, user);
-  $('auth-gate').classList.add('hidden');
-  $('app-shell').classList.remove('hidden');
-  $('user-name-display').textContent = user.full_name;
-  $('user-role-display').textContent = user.role;
-  $('user-avatar').textContent = initials(user.full_name);
-  refreshAll();
+
+  // 1) swap UI FIRST
+  const gate  = $('auth-gate');
+  const shell = $('app-shell');
+  if (gate)  gate.classList.add('hidden');
+  if (shell) {
+    shell.classList.remove('hidden');
+    shell.style.display = 'flex';
+    shell.style.flexDirection = 'column';
+  }
+
+  // 2) persist best-effort
+  const persisted = lsWrite(CONFIG.LS_SESSION, user);
+  if (!persisted) console.warn('[StitchLuxe] Session not persisted — will need re-login after refresh.');
+
+  // 3) header identity
+  const nameEl   = $('user-name-display');
+  const roleEl   = $('user-role-display');
+  const avatarEl = $('user-avatar');
+  if (nameEl)   nameEl.textContent   = user.full_name || user.email;
+  if (roleEl)   roleEl.textContent   = user.role;
+  if (avatarEl) avatarEl.textContent = initials(user.full_name || user.email);
+
+  // 4) hydrate rest
+  refreshAll().catch(err => console.warn('[StitchLuxe] refreshAll error:', err));
 }
 
 async function handleLogout() {
-  await db.signOut();
+  try { await db.signOut(); } catch (e) { console.warn('[StitchLuxe] logout error:', e); }
   state.user = null;
-  $('app-shell').classList.add('hidden');
-  $('auth-gate').classList.remove('hidden');
+  const shell = $('app-shell');
+  const gate  = $('auth-gate');
+  if (shell) { shell.classList.add('hidden'); shell.style.display = 'none'; }
+  if (gate)  { gate.classList.remove('hidden'); gate.style.display = 'flex'; }
   toast('Signed out.', 'info');
 }
 
@@ -338,20 +541,23 @@ function switchTab(tab) {
     b.classList.toggle('tab-active', b.dataset.tab === tab);
   });
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
-  $('tab-' + tab).classList.remove('hidden');
-  if (tab === 'payments') renderPayments();
-  if (tab === 'market') renderMarket();
+  const panel = $('tab-' + tab);
+  if (panel) panel.classList.remove('hidden');
+
+  if (tab === 'payments')   renderPayments();
+  if (tab === 'market')     renderMarket();
   if (tab === 'apprentice') renderApplications();
 }
 
 /* =============================================================
-   RENDER: ORDERS + MILESTONES + CHAT
+   RENDER: ORDERS
    ============================================================= */
 function renderOrders() {
   const root = $('list-root');
+  if (!root) return;
   const q = ($('order-search')?.value || '').toLowerCase().trim();
   let rows = [...state.orders];
-  if (q) rows = rows.filter(o => (o.garment_type + ' ' + (o.description||'')).toLowerCase().includes(q));
+  if (q) rows = rows.filter(o => (String(o.garment_type||'') + ' ' + String(o.description||'')).toLowerCase().includes(q));
   root.innerHTML = '';
   if (!rows.length) {
     root.innerHTML = `<li class="text-sm text-black/40 italic text-center py-8">No orders yet. Create your first bespoke order.</li>`;
@@ -361,22 +567,21 @@ function renderOrders() {
     const li = document.createElement('li');
     li.className = 'bg-[#faf8f3] rounded-xl p-4 cursor-pointer hover:bg-[#f5f2ea] transition border border-black/5';
     li.onclick = () => openOrder(o.id);
-    const msDone = o.milestone - 1;
     const total = MILESTONES.length;
-    const pct = Math.round(((o.milestone) / total) * 100);
+    const pct = Math.round(((o.milestone || 1) / total) * 100);
     li.innerHTML = `
       <div class="flex items-start justify-between gap-3">
         <div class="min-w-0">
           <div class="font-semibold text-sm truncate">${escapeHtml(o.garment_type || 'Garment')}</div>
           <div class="text-xs text-black/50 truncate mt-0.5">${escapeHtml((o.description||'').slice(0,50) || 'No description')}</div>
         </div>
-        <span class="badge ${o.status==='completed'?'bg-green-100 text-green-700':'bg-[#c9a227]/20 text-[#8a6d00]'}">${o.status || 'pending'}</span>
+        <span class="badge ${o.status==='completed'?'bg-green-100 text-green-700':'bg-[#c9a227]/20 text-[#8a6d00]'}">${escapeHtml(o.status || 'pending')}</span>
       </div>
       <div class="mt-3 h-1.5 bg-black/5 rounded-full overflow-hidden">
         <div class="h-full bg-[#c9a227]" style="width:${pct}%"></div>
       </div>
       <div class="flex justify-between text-[10px] text-black/40 mt-1">
-        <span>Milestone ${o.milestone}/${total}</span>
+        <span>Milestone ${o.milestone || 1}/${total}</span>
         <span>${money(o.budget)}</span>
       </div>
     `;
@@ -386,12 +591,13 @@ function renderOrders() {
 
 function renderMilestoneBar(order) {
   const bar = $('milestone-bar');
+  if (!bar) return;
   bar.innerHTML = '';
   MILESTONES.forEach((label, i) => {
     const step = i + 1;
     const span = document.createElement('div');
     let cls = 'ms-step flex-1 text-[9px] sm:text-[10px] font-semibold text-center py-1.5 px-1 rounded-md bg-black/5 text-black/50 transition';
-    if (step < order.milestone) cls += ' done';
+    if (step < order.milestone)       cls += ' done';
     else if (step === order.milestone) cls += ' active';
     span.className = cls;
     span.textContent = (step < order.milestone ? '✓ ' : '') + label;
@@ -404,25 +610,29 @@ async function openOrder(orderId) {
   const o = state.orders.find(x => x.id === orderId);
   if (!o) return;
   state.activeOrderId = orderId;
-  $('modal-order').classList.remove('hidden');
-  $('modal-order-title').textContent = o.garment_type || 'Bespoke Order';
-  $('modal-order-meta').textContent = `Created ${fmtDate(o.created_at)} • Budget ${money(o.budget)}`;
+
+  $('modal-order')?.classList.remove('hidden');
+  if ($('modal-order-title')) $('modal-order-title').textContent = o.garment_type || 'Bespoke Order';
+  if ($('modal-order-meta'))  $('modal-order-meta').textContent  = `Created ${fmtDate(o.created_at)} • Budget ${money(o.budget)}`;
+
   renderMilestoneBar(o);
-  // pinterest
+
   if (o.pinterest_url) {
-    $('modal-pinterest').href = o.pinterest_url;
-    $('modal-pinterest-wrap').classList.remove('hidden');
-  } else $('modal-pinterest-wrap').classList.add('hidden');
-  // measurements
+    if ($('modal-pinterest')) $('modal-pinterest').href = o.pinterest_url;
+    $('modal-pinterest-wrap')?.classList.remove('hidden');
+  } else {
+    $('modal-pinterest-wrap')?.classList.add('hidden');
+  }
+
   const m = o.measurements || {};
   const mtxt = ['bust','waist','hips'].filter(k => m[k]).map(k => `${k}: ${m[k]}in`).join(' · ') || '—';
-  $('modal-measurements').textContent = mtxt;
-  // tailor-only actions
-  const isTailor = state.user.role === 'tailor';
-  $('btn-request-pay').classList.toggle('hidden', !isTailor);
-  $('btn-advance-ms').classList.toggle('hidden', !isTailor);
-  $('pay-request-form').classList.add('hidden');
-  // load chat
+  if ($('modal-measurements')) $('modal-measurements').textContent = mtxt;
+
+  const isTailor = state.user?.role === 'tailor';
+  $('btn-request-pay')?.classList.toggle('hidden', !isTailor);
+  $('btn-advance-ms')?.classList.toggle('hidden', !isTailor);
+  $('pay-request-form')?.classList.add('hidden');
+
   await loadChat(orderId);
 }
 
@@ -433,6 +643,7 @@ async function loadChat(orderId) {
 
 function renderChat() {
   const log = $('chat-log');
+  if (!log) return;
   const msgs = state.messages[state.activeOrderId] || [];
   log.innerHTML = '';
   if (!msgs.length) {
@@ -470,14 +681,16 @@ function renderChat() {
     log.appendChild(wrap);
   });
   log.scrollTop = log.scrollHeight;
-  // wire pay buttons
-  log.querySelectorAll('.pay-now').forEach(b => b.onclick = () => startPaystack(Number(b.dataset.amount), b.dataset.method));
+  log.querySelectorAll('.pay-now').forEach(b => {
+    b.onclick = () => startPaystack(Number(b.dataset.amount), b.dataset.method);
+  });
 }
 
 async function sendChat() {
-  const text = $('chat-input').value.trim();
+  const input = $('chat-input');
+  const text = input?.value.trim();
   if (!text || !state.activeOrderId) return;
-  $('chat-input').value = '';
+  input.value = '';
   await db.createMessage({
     order_id: state.activeOrderId,
     sender_id: state.user.id,
@@ -502,14 +715,13 @@ async function askBestWayToPay() {
 }
 
 async function sendPaymentRequest() {
-  const amount = Number($('pr-amount').value);
-  const method = $('pr-method').value;
-  const notes = $('pr-notes').value.trim();
+  const amount = Number($('pr-amount')?.value);
+  const method = $('pr-method')?.value || 'bank_transfer';
+  const notes  = $('pr-notes')?.value.trim() || '';
   if (!amount || amount <= 0) return toast('Enter a valid amount.', 'error');
   const order = state.orders.find(o => o.id === state.activeOrderId);
   if (!order) return;
 
-  // 1) chat message
   await db.createMessage({
     order_id: state.activeOrderId,
     sender_id: state.user.id,
@@ -518,16 +730,18 @@ async function sendPaymentRequest() {
     message_type: 'payment_request',
     amount, method
   });
-  // 2) payment record
+
   await db.createPayment({
     order_id: state.activeOrderId,
     client_id: order.client_id,
     tailor_id: state.user.id,
-    amount, method,
-    notes
+    amount, method, notes
   });
-  $('pay-request-form').classList.add('hidden');
-  $('pr-amount').value = ''; $('pr-notes').value = '';
+
+  $('pay-request-form')?.classList.add('hidden');
+  if ($('pr-amount')) $('pr-amount').value = '';
+  if ($('pr-notes'))  $('pr-notes').value = '';
+
   await loadChat(state.activeOrderId);
   toast('Payment request sent.', 'success');
 }
@@ -542,7 +756,7 @@ async function advanceMilestone() {
     status: next === MILESTONES.length ? 'completed' : 'in_progress',
     tailor_id: state.user.id
   });
-  Object.assign(order, updated);
+  Object.assign(order, updated || {});
   renderMilestoneBar(order);
   renderOrders();
   await db.createMessage({
@@ -557,30 +771,32 @@ async function advanceMilestone() {
 }
 
 /* =============================================================
-   PAYSTACK PAYMENT
+   PAYSTACK
    ============================================================= */
 function startPaystack(amount, method) {
   if (method !== 'paystack_card') {
-    // non-card methods → informational
-    toast(`Follow the ${method.replace('_',' ')} instructions from your tailor.`, 'info');
+    toast(`Follow the ${String(method||'').replace('_',' ')} instructions from your tailor.`, 'info');
     return;
   }
   if (typeof PaystackPop === 'undefined') {
     return toast('Paystack SDK not loaded.', 'error');
   }
-  if (!CONFIG.PAYSTACK_PUBLIC_KEY || CONFIG.PAYSTACK_PUBLIC_KEY.includes('xxxx')) {
-    return toast('Paystack public key not configured — set STITCHLUXE_PAYSTACK_KEY.', 'warn');
+  if (!CONFIG.PAYSTACK_PUBLIC_KEY || CONFIG.PAYSTACK_PUBLIC_KEY.includes('PASTE')) {
+    return toast('Paystack key not configured.', 'warn');
   }
   const ref = 'SLX-' + Date.now();
   const handler = PaystackPop.setup({
     key: CONFIG.PAYSTACK_PUBLIC_KEY,
     email: state.user.email,
-    amount: Math.round(amount * 100), // kobo
+    amount: Math.round(amount * 100),
     currency: 'NGN',
     ref,
-    metadata: { order_id: state.activeOrderId, custom_fields: [
-      { display_name: 'Order', variable_name: 'order_id', value: state.activeOrderId || '' }
-    ]},
+    metadata: {
+      order_id: state.activeOrderId,
+      custom_fields: [
+        { display_name: 'Order', variable_name: 'order_id', value: state.activeOrderId || '' }
+      ]
+    },
     callback: async function (response) {
       toast('Payment successful! Ref: ' + response.reference, 'success');
       await db.createMessage({
@@ -591,7 +807,6 @@ function startPaystack(amount, method) {
         message_type: 'payment_confirmed',
         amount, method: 'paystack_card'
       });
-      // mark any matching payment request as paid
       const pending = state.payments.filter(p => p.order_id === state.activeOrderId && p.status === 'pending');
       for (const p of pending) await db.updatePayment(p.id, { status: 'paid', paystack_ref: response.reference });
       await loadChat(state.activeOrderId);
@@ -603,11 +818,12 @@ function startPaystack(amount, method) {
 }
 
 /* =============================================================
-   RENDER: PAYMENTS TAB
+   RENDER: PAYMENTS
    ============================================================= */
 async function renderPayments() {
   state.payments = await db.listPayments();
   const el = $('payments-list');
+  if (!el) return;
   if (!state.payments.length) {
     el.innerHTML = `<div class="text-sm text-black/40 italic text-center py-8">No payment requests yet. Open an order and ask your tailor how best to pay.</div>`;
     return;
@@ -618,20 +834,21 @@ async function renderPayments() {
         <div class="text-sm font-semibold">${money(p.amount)}</div>
         <div class="text-xs text-black/50 mt-0.5">Method: <b>${escapeHtml((p.method||'').replace(/_/g,' '))}</b> • ${escapeHtml(p.notes||'')}</div>
       </div>
-      <span class="badge ${p.status==='paid'?'bg-green-100 text-green-700':p.status==='failed'?'bg-red-100 text-red-700':'bg-[#c9a227]/20 text-[#8a6d00]'}">${p.status}</span>
+      <span class="badge ${p.status==='paid'?'bg-green-100 text-green-700':p.status==='failed'?'bg-red-100 text-red-700':'bg-[#c9a227]/20 text-[#8a6d00]'}">${escapeHtml(p.status)}</span>
     </div>
   `).join('');
 }
 
 /* =============================================================
-   RENDER: MARKETPLACE
+   RENDER: MARKET
    ============================================================= */
 async function renderMarket() {
   state.listings = await db.listListings();
   const q = ($('market-search')?.value || '').toLowerCase().trim();
   let items = state.listings;
-  if (q) items = items.filter(l => (l.title + ' ' + (l.description||'')).toLowerCase().includes(q));
+  if (q) items = items.filter(l => (String(l.title||'') + ' ' + String(l.description||'')).toLowerCase().includes(q));
   const grid = $('market-grid');
+  if (!grid) return;
   if (!items.length) {
     grid.innerHTML = `<div class="col-span-full text-sm text-black/40 italic text-center py-8">No listings yet. Be the first to list a pre-loved piece.</div>`;
     return;
@@ -646,7 +863,7 @@ async function renderMarket() {
         <div class="text-xs text-black/50 truncate mt-0.5">${escapeHtml(l.size||'')} • ${escapeHtml(l.condition||'')}</div>
         <div class="flex items-center justify-between mt-2">
           <div class="font-bold text-sm">${money(l.price)}</div>
-          <span class="badge ${l.status==='available'?'bg-green-100 text-green-700':'bg-black/10 text-black/50'}">${l.status}</span>
+          <span class="badge ${l.status==='available'?'bg-green-100 text-green-700':'bg-black/10 text-black/50'}">${escapeHtml(l.status)}</span>
         </div>
       </div>
     </div>
@@ -659,6 +876,7 @@ async function renderMarket() {
 async function renderApplications() {
   state.applications = await db.listApplications();
   const el = $('apps-list');
+  if (!el) return;
   if (!state.applications.length) {
     el.innerHTML = `<li class="text-sm text-black/40 italic text-center py-8">No applications yet.</li>`;
     return;
@@ -671,7 +889,7 @@ async function renderApplications() {
           <div class="text-xs text-black/50 truncate">${escapeHtml(a.email||'')} • ${a.years_experience || 0} yr exp</div>
           ${a.portfolio_url ? `<a href="${escapeHtml(a.portfolio_url)}" target="_blank" class="text-xs text-[#8a6d00] underline mt-1 inline-block">Portfolio →</a>` : ''}
         </div>
-        <span class="badge ${a.status==='accepted'?'bg-green-100 text-green-700':a.status==='rejected'?'bg-red-100 text-red-700':'bg-[#c9a227]/20 text-[#8a6d00]'}">${a.status}</span>
+        <span class="badge ${a.status==='accepted'?'bg-green-100 text-green-700':a.status==='rejected'?'bg-red-100 text-red-700':'bg-[#c9a227]/20 text-[#8a6d00]'}">${escapeHtml(a.status)}</span>
       </div>
     </li>
   `).join('');
@@ -684,15 +902,15 @@ async function submitOrder(e) {
   e.preventDefault();
   const payload = {
     client_id: state.user.id,
-    garment_type: $('order-garment').value,
-    description: $('order-desc').value.trim(),
-    pinterest_url: $('order-pinterest').value.trim(),
+    garment_type: $('order-garment')?.value || '',
+    description:  $('order-desc')?.value.trim() || '',
+    pinterest_url:$('order-pinterest')?.value.trim() || '',
     measurements: {
-      bust: $('m-bust').value ? Number($('m-bust').value) : null,
-      waist: $('m-waist').value ? Number($('m-waist').value) : null,
-      hips: $('m-hips').value ? Number($('m-hips').value) : null
+      bust:  $('m-bust')?.value  ? Number($('m-bust').value)  : null,
+      waist: $('m-waist')?.value ? Number($('m-waist').value) : null,
+      hips:  $('m-hips')?.value  ? Number($('m-hips').value)  : null
     },
-    budget: Number($('order-budget').value) || 0,
+    budget: Number($('order-budget')?.value) || 0,
     milestone: 1,
     status: 'pending'
   };
@@ -707,15 +925,15 @@ async function submitOrder(e) {
 async function submitListing(e) {
   e.preventDefault();
   const payload = {
-    seller_id: state.user.id,
+    seller_id:   state.user.id,
     seller_name: state.user.full_name,
-    title: $('list-title').value.trim(),
-    description: $('list-desc').value.trim(),
-    price: Number($('list-price').value) || 0,
-    size: $('list-size').value.trim(),
-    condition: $('list-condition').value,
-    image_url: $('list-image').value.trim(),
-    status: 'available'
+    title:       $('list-title')?.value.trim() || '',
+    description: $('list-desc')?.value.trim() || '',
+    price:       Number($('list-price')?.value) || 0,
+    size:        $('list-size')?.value.trim() || '',
+    condition:   $('list-condition')?.value || '',
+    image_url:   $('list-image')?.value.trim() || '',
+    status:      'available'
   };
   if (!payload.title || !payload.price) return toast('Title and price required.', 'error');
   const row = await db.createListing(payload);
@@ -729,12 +947,12 @@ async function submitApplication(e) {
   e.preventDefault();
   const payload = {
     applicant_id: state.user.id,
-    mentor_id: null,
-    full_name: $('app-name').value.trim(),
-    email: $('app-email').value.trim(),
-    portfolio_url: $('app-portfolio').value.trim(),
-    cover_letter: $('app-cover').value.trim(),
-    years_experience: Number($('app-years').value) || 0,
+    mentor_id:    null,
+    full_name:    $('app-name')?.value.trim() || '',
+    email:        $('app-email')?.value.trim() || '',
+    portfolio_url:$('app-portfolio')?.value.trim() || '',
+    cover_letter: $('app-cover')?.value.trim() || '',
+    years_experience: Number($('app-years')?.value) || 0,
     status: 'pending'
   };
   if (!payload.full_name || !payload.email) return toast('Name and email are required.', 'error');
@@ -742,26 +960,25 @@ async function submitApplication(e) {
   state.applications.unshift(row);
   e.target.reset();
   renderApplications();
-  toast('Application submitted. We will reach out.', 'success');
+  toast('Application submitted.', 'success');
 }
 
 /* =============================================================
-   REFRESH ALL
+   REFRESH
    ============================================================= */
 async function refreshAll() {
   if (!state.user) return;
   try {
-    state.orders = await db.listOrders();
-    state.listings = await db.listListings();
+    state.orders       = await db.listOrders();
+    state.listings     = await db.listListings();
     state.applications = await db.listApplications();
-    state.payments = await db.listPayments();
+    state.payments     = await db.listPayments();
     renderOrders();
     renderMarket();
     renderApplications();
     renderPayments();
   } catch (err) {
-    console.error(err);
-    toast('Failed to load data.', 'error');
+    console.error('[StitchLuxe] refresh error', err);
   }
 }
 
@@ -769,51 +986,52 @@ async function refreshAll() {
    INIT
    ============================================================= */
 function init() {
-  // year
-  $('footer-year').textContent = new Date().getFullYear();
+  const yearEl = $('footer-year');
+  if (yearEl) yearEl.textContent = new Date().getFullYear();
 
-  // restore session
-  const saved = lsRead(CONFIG.LS_SESSION, null);
-  if (saved) startSession(saved);
+  console.log('[StitchLuxe] init • mode:', useLocal ? 'LOCAL FALLBACK' : 'SUPABASE');
 
-  // auth listeners
-  $('auth-form').addEventListener('submit', handleLogin);
-  $('btn-signup').addEventListener('click', handleSignup);
-  $('btn-demo').addEventListener('click', handleDemo);
-  $('btn-logout').addEventListener('click', handleLogout);
+  try {
+    const saved = lsRead(CONFIG.LS_SESSION, null);
+    if (saved && saved.id && saved.email) {
+      console.log('[StitchLuxe] restoring session for', saved.email);
+      startSession(saved);
+    }
+  } catch (e) {
+    console.warn('[StitchLuxe] session restore failed:', e);
+  }
 
-  // tab listeners
-  document.querySelectorAll('.tab-btn').forEach(b => b.onclick = () => switchTab(b.dataset.tab));
+  $('auth-form')?.addEventListener('submit', handleLogin);
+  $('btn-signup')?.addEventListener('click', handleSignup);
+  $('btn-demo')?.addEventListener('click', handleDemo);
+  $('btn-logout')?.addEventListener('click', handleLogout);
 
-  // form listeners
-  $('form-order').addEventListener('submit', submitOrder);
-  $('form-listing').addEventListener('submit', submitListing);
-  $('form-apprentice').addEventListener('submit', submitApplication);
+  document.querySelectorAll('.tab-btn').forEach(b => {
+    b.addEventListener('click', () => switchTab(b.dataset.tab));
+  });
 
-  // search listeners
-  $('order-search').addEventListener('input', renderOrders);
-  $('market-search').addEventListener('input', renderMarket);
+  $('form-order')?.addEventListener('submit', submitOrder);
+  $('form-listing')?.addEventListener('submit', submitListing);
+  $('form-apprentice')?.addEventListener('submit', submitApplication);
 
-  // modal listeners
-  $('btn-close-order').onclick = () => {
-    $('modal-order').classList.add('hidden');
+  $('order-search')?.addEventListener('input', renderOrders);
+  $('market-search')?.addEventListener('input', renderMarket);
+
+  $('btn-close-order')?.addEventListener('click', () => {
+    $('modal-order')?.classList.add('hidden');
     state.activeOrderId = null;
-  };
-  $('btn-send-chat').onclick = sendChat;
-  $('chat-input').addEventListener('keypress', (e) => { if (e.key === 'Enter') sendChat(); });
-  $('btn-ask-pay').onclick = askBestWayToPay;
-  $('btn-request-pay').onclick = () => $('pay-request-form').classList.toggle('hidden');
-  $('btn-cancel-pay-req').onclick = () => $('pay-request-form').classList.add('hidden');
-  $('btn-send-pay-req').onclick = sendPaymentRequest;
-  $('btn-advance-ms').onclick = advanceMilestone;
-
-  // seal env vars off window (hygiene)
-  delete window.STITCHLUXE_SUPABASE_URL;
-  delete window.STITCHLUXE_SUPABASE_ANON_KEY;
-  delete window.STITCHLUXE_PAYSTACK_KEY;
-
-  console.log('[StitchLuxe Extra Lite] init • mode:', useLocal ? 'LOCAL FALLBACK' : 'SUPABASE');
+  });
+  $('btn-send-chat')?.addEventListener('click', sendChat);
+  $('chat-input')?.addEventListener('keypress', e => { if (e.key === 'Enter') sendChat(); });
+  $('btn-ask-pay')?.addEventListener('click', askBestWayToPay);
+  $('btn-request-pay')?.addEventListener('click', () => $('pay-request-form')?.classList.toggle('hidden'));
+  $('btn-cancel-pay-req')?.addEventListener('click', () => $('pay-request-form')?.classList.add('hidden'));
+  $('btn-send-pay-req')?.addEventListener('click', sendPaymentRequest);
+  $('btn-advance-ms')?.addEventListener('click', advanceMilestone);
 }
 
-if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
-else init();
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}
