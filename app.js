@@ -1,9 +1,5 @@
 /* =============================================================
-   StitchLuxe Extra Lite — app.js  (v2.5)
-   - Tailors self-serve their own WhatsApp number
-   - Full country + state + dial-code phone picker
-   - WhatsApp payment flow (no card)
-   - Direct Pinterest picker
+   StitchLuxe Extra Lite — app.js  (v2.5, complete)
    ============================================================= */
 
 window.addEventListener('error', e =>
@@ -72,10 +68,10 @@ const PINTEREST_QUERIES = {
 /* ---------- STATE ---------- */
 const state = {
   user: null,
+  profile: null,
   orders: [], listings: [], applications: [], payments: [],
   messages: {}, activeOrderId: null, activeTab: 'orders',
-  profile: null,
-  pickers: {}          // named phone-picker instances
+  pickers: {}
 };
 
 /* ---------- UTIL ---------- */
@@ -102,7 +98,7 @@ function toast(msg, type='info') {
   };
   const el = document.createElement('div');
   el.className = 'toast text-sm font-semibold px-4 py-3 rounded-xl shadow-lg';
-  el.setAttribute('style', styles[type]);
+  el.setAttribute('style', styles[type] || styles.info);
   el.textContent = msg;
   wrap.appendChild(el);
   setTimeout(() => el.remove(), 3500);
@@ -156,18 +152,20 @@ function seedLocal() {
   seed.profiles['mastertailor@stitchluxe.com'] = {
     id: 'tailor-demo-001', email: 'mastertailor@stitchluxe.com',
     full_name: 'Master Ade Tailor', role: 'tailor',
-    whatsapp: '2348012345678', country: 'NG', state: 'Lagos'
+    whatsapp: '2348012345678', country: 'NG', state: 'Lagos', phone_raw: '8012345678'
   };
   seed.profiles['designer@stitchluxe.com'] = {
     id: 'client-demo-001', email: 'designer@stitchluxe.com',
     full_name: 'Ada Designer', role: 'client',
-    whatsapp: '2348098765432', country: 'NG', state: 'Lagos'
+    whatsapp: '2348098765432', country: 'NG', state: 'Lagos', phone_raw: '8098765432'
   };
   lsWrite(CONFIG.LS_KEY, seed);
   return seed;
 }
 
-/* ---------- DB ADAPTER ---------- */
+/* =============================================================
+   DB ADAPTER
+   ============================================================= */
 const db = {
   async signIn(email, password, role) {
     if (supabaseReady()) {
@@ -178,18 +176,23 @@ const db = {
         try {
           const { data: p } = await sb.from('profiles').select('*').eq('id', data.user.id).single();
           profile = p;
-        } catch {}
+        } catch (e) { /* profile table may not be ready */ }
         return { user: data.user, profile: profile || { id: data.user.id, email, full_name: email, role } };
-      } catch (e) { if (isStructuralError(e)) forceLocalMode('signIn'); else throw e; }
+      } catch (e) {
+        if (isStructuralError(e)) forceLocalMode('signIn');
+        else throw e;
+      }
     }
     const store = seedLocal();
     let profile = store.profiles[email];
     if (!profile) {
       profile = { id: uid(), email, full_name: email.split('@')[0], role: role || 'client' };
-      store.profiles[email] = profile; lsWrite(CONFIG.LS_KEY, store);
+      store.profiles[email] = profile;
+      lsWrite(CONFIG.LS_KEY, store);
     }
     return { user: { id: profile.id, email }, profile };
   },
+
   async signUp(email, password, fullName, role) {
     if (supabaseReady()) {
       try {
@@ -198,19 +201,23 @@ const db = {
         });
         if (error) throw error;
         return { user: data.user, profile: { id: data.user?.id, email, full_name: fullName, role } };
-      } catch (e) { if (isStructuralError(e)) forceLocalMode('signUp'); else throw e; }
+      } catch (e) {
+        if (isStructuralError(e)) forceLocalMode('signUp');
+        else throw e;
+      }
     }
     const store = seedLocal();
     const profile = { id: uid(), email, full_name: fullName, role: role || 'client' };
-    store.profiles[email] = profile; lsWrite(CONFIG.LS_KEY, store);
+    store.profiles[email] = profile;
+    lsWrite(CONFIG.LS_KEY, store);
     return { user: { id: profile.id, email }, profile };
   },
+
   async signOut() {
-    if (supabaseReady()) try { await sb.auth.signOut(); } catch {}
-    try { localStorage.removeItem(CONFIG.LS_SESSION); } catch {}
+    if (supabaseReady()) try { await sb.auth.signOut(); } catch (e) {}
+    try { localStorage.removeItem(CONFIG.LS_SESSION); } catch (e) {}
   },
 
-  /* ---------- PROFILES ---------- */
   async getProfile(id) {
     if (!id) return null;
     if (supabaseReady()) {
@@ -218,12 +225,14 @@ const db = {
         const { data, error } = await sb.from('profiles').select('*').eq('id', id).single();
         if (error) throw error;
         return data;
-      } catch (e) { if (isStructuralError(e)) forceLocalMode('getProfile'); else throw e; }
+      } catch (e) {
+        if (isStructuralError(e)) forceLocalMode('getProfile');
+      }
     }
     const store = seedLocal();
-    const entry = Object.values(store.profiles || {}).find(p => p.id === id);
-    return entry || null;
+    return Object.values(store.profiles || {}).find(p => p.id === id) || null;
   },
+
   async updateProfile(id, patch) {
     if (!id) return null;
     if (supabaseReady()) {
@@ -231,7 +240,10 @@ const db = {
         const { data, error } = await sb.from('profiles').update(patch).eq('id', id).select().single();
         if (error) throw error;
         return data;
-      } catch (e) { if (isStructuralError(e)) forceLocalMode('updateProfile'); else throw e; }
+      } catch (e) {
+        if (isStructuralError(e)) forceLocalMode('updateProfile');
+        else throw e;
+      }
     }
     const store = seedLocal();
     const key = Object.keys(store.profiles || {}).find(k => store.profiles[k].id === id);
@@ -247,148 +259,180 @@ const db = {
     if (supabaseReady()) {
       try {
         const { data, error } = await sb.from('bespoke_orders').select('*').order('created_at', { ascending:false });
-        if (error) throw error; return data || [];
+        if (error) throw error;
+        return data || [];
       } catch (e) { if (isStructuralError(e)) forceLocalMode('listOrders'); else throw e; }
     }
     const store = seedLocal();
     return (store.orders || []).filter(o =>
       o.client_id === state.user?.id || o.tailor_id === state.user?.id || !o.tailor_id);
   },
+
   async createOrder(payload) {
     if (supabaseReady()) {
       try {
         const { data, error } = await sb.from('bespoke_orders').insert(payload).select().single();
-        if (error) throw error; return data;
+        if (error) throw error;
+        return data;
       } catch (e) { if (isStructuralError(e)) forceLocalMode('createOrder'); else throw e; }
     }
     const store = seedLocal();
     const row = { id: uid(), created_at: Date.now(), updated_at: Date.now(), milestone: 1, status:'pending', ...payload };
-    store.orders.push(row); lsWrite(CONFIG.LS_KEY, store); return row;
+    store.orders.push(row);
+    lsWrite(CONFIG.LS_KEY, store);
+    return row;
   },
+
   async updateOrder(id, patch) {
     if (supabaseReady()) {
       try {
         const { data, error } = await sb.from('bespoke_orders')
           .update({ ...patch, updated_at: new Date().toISOString() })
           .eq('id', id).select().single();
-        if (error) throw error; return data;
+        if (error) throw error;
+        return data;
       } catch (e) { if (isStructuralError(e)) forceLocalMode('updateOrder'); else throw e; }
     }
     const store = seedLocal();
     const idx = store.orders.findIndex(o => o.id === id);
     if (idx >= 0) {
       store.orders[idx] = { ...store.orders[idx], ...patch, updated_at: Date.now() };
-      lsWrite(CONFIG.LS_KEY, store); return store.orders[idx];
+      lsWrite(CONFIG.LS_KEY, store);
+      return store.orders[idx];
     }
   },
+
   async listMessages(orderId) {
     if (supabaseReady()) {
       try {
         const { data, error } = await sb.from('order_messages').select('*')
           .eq('order_id', orderId).order('created_at', { ascending:true });
-        if (error) throw error; return data || [];
+        if (error) throw error;
+        return data || [];
       } catch (e) { if (isStructuralError(e)) forceLocalMode('listMessages'); else throw e; }
     }
     const store = seedLocal();
     return store.messages[orderId] || [];
   },
+
   async createMessage(payload) {
     if (supabaseReady()) {
       try {
         const { data, error } = await sb.from('order_messages').insert(payload).select().single();
-        if (error) throw error; return data;
+        if (error) throw error;
+        return data;
       } catch (e) { if (isStructuralError(e)) forceLocalMode('createMessage'); else throw e; }
     }
     const store = seedLocal();
     const row = { id: uid(), created_at: Date.now(), ...payload };
     store.messages[row.order_id] = [...(store.messages[row.order_id] || []), row];
-    lsWrite(CONFIG.LS_KEY, store); return row;
+    lsWrite(CONFIG.LS_KEY, store);
+    return row;
   },
+
   async listPayments() {
     if (supabaseReady()) {
       try {
         const { data, error } = await sb.from('payment_requests').select('*').order('created_at', { ascending:false });
-        if (error) throw error; return data || [];
+        if (error) throw error;
+        return data || [];
       } catch (e) { if (isStructuralError(e)) forceLocalMode('listPayments'); else throw e; }
     }
     const store = seedLocal();
     return (store.payments || []).filter(p =>
       p.client_id === state.user?.id || p.tailor_id === state.user?.id);
   },
+
   async createPayment(payload) {
     if (supabaseReady()) {
       try {
         const { data, error } = await sb.from('payment_requests').insert(payload).select().single();
-        if (error) throw error; return data;
+        if (error) throw error;
+        return data;
       } catch (e) { if (isStructuralError(e)) forceLocalMode('createPayment'); else throw e; }
     }
     const store = seedLocal();
     const row = { id: uid(), created_at: Date.now(), status:'pending', ...payload };
-    store.payments.push(row); lsWrite(CONFIG.LS_KEY, store); return row;
+    store.payments.push(row);
+    lsWrite(CONFIG.LS_KEY, store);
+    return row;
   },
+
   async updatePayment(id, patch) {
     if (supabaseReady()) {
       try {
         const { data, error } = await sb.from('payment_requests').update(patch).eq('id', id).select().single();
-        if (error) throw error; return data;
+        if (error) throw error;
+        return data;
       } catch (e) { if (isStructuralError(e)) forceLocalMode('updatePayment'); else throw e; }
     }
     const store = seedLocal();
     const idx = store.payments.findIndex(p => p.id === id);
     if (idx >= 0) {
       store.payments[idx] = { ...store.payments[idx], ...patch };
-      lsWrite(CONFIG.LS_KEY, store); return store.payments[idx];
+      lsWrite(CONFIG.LS_KEY, store);
+      return store.payments[idx];
     }
   },
+
   async listListings() {
     if (supabaseReady()) {
       try {
         const { data, error } = await sb.from('marketplace_listings').select('*').order('created_at', { ascending:false });
-        if (error) throw error; return data || [];
+        if (error) throw error;
+        return data || [];
       } catch (e) { if (isStructuralError(e)) forceLocalMode('listListings'); else throw e; }
     }
     const store = seedLocal();
     return store.listings || [];
   },
+
   async createListing(payload) {
     if (supabaseReady()) {
       try {
         const { data, error } = await sb.from('marketplace_listings').insert(payload).select().single();
-        if (error) throw error; return data;
+        if (error) throw error;
+        return data;
       } catch (e) { if (isStructuralError(e)) forceLocalMode('createListing'); else throw e; }
     }
     const store = seedLocal();
     const row = { id: uid(), created_at: Date.now(), status:'available', ...payload };
-    store.listings.push(row); lsWrite(CONFIG.LS_KEY, store); return row;
+    store.listings.push(row);
+    lsWrite(CONFIG.LS_KEY, store);
+    return row;
   },
+
   async listApplications() {
     if (supabaseReady()) {
       try {
         const { data, error } = await sb.from('apprentice_applications').select('*').order('created_at', { ascending:false });
-        if (error) throw error; return data || [];
+        if (error) throw error;
+        return data || [];
       } catch (e) { if (isStructuralError(e)) forceLocalMode('listApplications'); else throw e; }
     }
     const store = seedLocal();
     return (store.applications || []).filter(a =>
       a.applicant_id === state.user?.id || a.mentor_id === state.user?.id);
   },
+
   async createApplication(payload) {
     if (supabaseReady()) {
       try {
         const { data, error } = await sb.from('apprentice_applications').insert(payload).select().single();
-        if (error) throw error; return data;
+        if (error) throw error;
+        return data;
       } catch (e) { if (isStructuralError(e)) forceLocalMode('createApplication'); else throw e; }
     }
     const store = seedLocal();
     const row = { id: uid(), created_at: Date.now(), status:'pending', ...payload };
-    store.applications.push(row); lsWrite(CONFIG.LS_KEY, store); return row;
+    store.applications.push(row);
+    lsWrite(CONFIG.LS_KEY, store);
+    return row;
   }
 };
 
 /* =============================================================
    PHONE PICKER COMPONENT
-   Wraps a DOM container with .phone-country, .phone-state,
-   .phone-state-text, .dial-code, .phone-number
    ============================================================= */
 function createPhonePicker(container, opts = {}) {
   if (!container) return null;
@@ -399,7 +443,6 @@ function createPhonePicker(container, opts = {}) {
   const numberEl   = container.querySelector('.phone-number');
   if (!countrySel || !stateSel || !stateText || !dialEl || !numberEl) return null;
 
-  // Populate countries
   countrySel.innerHTML = COUNTRIES.map(c =>
     `<option value="${c.iso}">${c.flag}  ${c.name}  ${c.dial}</option>`).join('');
   countrySel.value = opts.defaultCountry || 'NG';
@@ -440,7 +483,7 @@ function createPhonePicker(container, opts = {}) {
         ? stateSel.value
         : stateText.value).trim();
       const raw = cleanPhone(numberEl.value);
-      const localRaw = raw.replace(/^0+/, '');       // strip leading zeros
+      const localRaw = raw.replace(/^0+/, '');
       const whatsapp = (raw && country?.dial)
         ? country.dial.replace('+', '') + localRaw
         : '';
@@ -488,14 +531,12 @@ function buildWhatsAppLink(phone, message) {
 }
 
 async function resolveTailorWhatsApp(order) {
-  // 1) Try order's assigned tailor profile
   if (order?.tailor_id) {
     try {
       const p = await db.getProfile(order.tailor_id);
       if (p?.whatsapp) return { number: p.whatsapp, name: p.full_name, isHouse: false };
     } catch (e) { console.warn('[StitchLuxe] resolve tailor failed', e); }
   }
-  // 2) Fall back to house number
   return { number: CONFIG.TAILOR_WHATSAPP, name: 'StitchLuxe Atelier', isHouse: true };
 }
 
@@ -542,10 +583,8 @@ function updatePinterestPicker() {
   const label = $('pin-browse-label');
   const nameEl = $('pin-garment-name');
   if (!sel || !wrap || !link) return;
-
   const garment = sel.value;
   if (!garment) { wrap.classList.add('hidden'); return; }
-
   link.href = pinterestSearchUrl(garment);
   const labelText = PINTEREST_QUERIES[garment] || 'styles';
   if (label) label.textContent = labelText;
@@ -575,10 +614,9 @@ function openTailorWaModal(opts = {}) {
     picker.setValue({
       country_iso: state.profile?.country || 'NG',
       state:       state.profile?.state || '',
-      phone_raw:   state.profile?.phone_raw || (state.profile?.whatsapp ? state.profile.whatsapp.replace(/^\d{1,3}/, '') : '')
+      phone_raw:   state.profile?.phone_raw || ''
     });
   }
-  // lock close on first-time prompt?
   const closeBtn = $('btn-close-tailor-wa');
   const cancelBtn = $('btn-cancel-tailor-wa');
   const lock = !!opts.lock;
@@ -591,7 +629,8 @@ function closeTailorWaModal() {
 }
 
 async function saveTailorWa() {
-  const picker = state.pickers.tailor; if (!picker) return;
+  const picker = state.pickers.tailor;
+  if (!picker) return;
   const v = picker.getValue();
   if (!v.country_iso) return toast('Please pick your country.', 'error');
   if (!v.phone_raw || v.phone_raw.length < 6) return toast('Please enter your phone number.', 'error');
@@ -636,11 +675,10 @@ async function handleLogin(e) {
   if (password.length < 6) return showAuthError('Password must be at least 6 characters.');
   try {
     const { user, profile } = await db.signIn(email, password, role);
-    startSession({
-      id: user.id, email,
-      full_name: profile?.full_name || email.split('@')[0],
-      role: profile?.role || role
-    }, profile);
+    startSession(
+      { id: user.id, email, full_name: profile?.full_name || email.split('@')[0], role: profile?.role || role },
+      profile
+    );
   } catch (err) {
     console.error('[StitchLuxe] sign-in failed', err);
     showAuthError(err?.message || 'Sign-in failed. Check your credentials.');
@@ -663,7 +701,6 @@ async function handleSignup() {
       profile
     );
     toast('Welcome to StitchLuxe!', 'success');
-    // Prompt tailors to set their WhatsApp right away
     if ((profile?.role || role) === 'tailor') {
       setTimeout(() => openTailorWaModal({ lock: false }), 500);
     }
@@ -683,6 +720,7 @@ function handleDemo() {
 function startSession(user, profile) {
   state.user = user;
   state.profile = profile || { id: user.id, email: user.email, full_name: user.full_name, role: user.role };
+
   const gate = $('auth-gate'), shell = $('app-shell');
   if (gate) gate.classList.add('hidden');
   if (shell) {
@@ -691,11 +729,11 @@ function startSession(user, profile) {
     shell.style.flexDirection = 'column';
   }
   lsWrite(CONFIG.LS_SESSION, user);
+
   if ($('user-name-display')) $('user-name-display').textContent = user.full_name || user.email;
   if ($('user-role-display')) $('user-role-display').textContent = user.role;
   if ($('user-avatar'))       $('user-avatar').textContent = initials(user.full_name || user.email);
 
-  // Prefill client phone picker from profile if available
   if (state.pickers.client && state.profile) {
     state.pickers.client.setValue({
       country_iso: state.profile.country || 'NG',
@@ -706,7 +744,6 @@ function startSession(user, profile) {
 
   updateTailorSetupBanner();
 
-  // Tailor who is missing their number → open prompt quietly after a beat
   if (user.role === 'tailor' && !state.profile?.whatsapp) {
     setTimeout(() => openTailorWaModal({ lock: false }), 700);
   }
@@ -715,7 +752,7 @@ function startSession(user, profile) {
 }
 
 async function handleLogout() {
-  try { await db.signOut(); } catch {}
+  try { await db.signOut(); } catch (e) {}
   state.user = null;
   state.profile = null;
   const shell = $('app-shell'), gate = $('auth-gate');
@@ -732,7 +769,8 @@ function switchTab(tab) {
   document.querySelectorAll('.tab-btn').forEach(b =>
     b.classList.toggle('tab-active', b.dataset.tab === tab));
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
-  $('tab-' + tab)?.classList.remove('hidden');
+  const panel = $('tab-' + tab);
+  if (panel) panel.classList.remove('hidden');
   if (tab === 'payments')   renderPayments();
   if (tab === 'market')     renderMarket();
   if (tab === 'apprentice') renderApplications();
@@ -807,7 +845,7 @@ async function openOrder(orderId) {
 
   if (o.pinterest_url) {
     const pin = $('modal-pinterest');
-    if (pin) { pin.href = o.pinterest_url; }
+    if (pin) pin.href = o.pinterest_url;
     $('modal-pinterest-wrap')?.classList.remove('hidden');
   } else {
     $('modal-pinterest-wrap')?.classList.add('hidden');
@@ -820,7 +858,6 @@ async function openOrder(orderId) {
   const isTailor = state.user?.role === 'tailor';
   $('btn-advance-ms')?.classList.toggle('hidden', !isTailor);
 
-  // Resolve tailor name for the WhatsApp CTA copy
   const resolved = await resolveTailorWhatsApp(o);
   const lineEl = $('wa-tailor-line');
   const subEl  = $('wa-tailor-sub');
@@ -960,12 +997,7 @@ async function renderPayments() {
           </div>
           <span class="badge badge-gold">No payment yet</span>
         </div>
-        <button class="btn btn-whatsapp btn-sm w-full wa-order-btn">
-          <svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px">
-            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347"/>
-          </svg>
-          Ask tailor on WhatsApp
-        </button>
+        <button class="btn btn-whatsapp btn-sm w-full wa-order-btn">Ask tailor on WhatsApp</button>
       `;
       card.querySelector('.wa-order-btn')?.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -993,6 +1025,248 @@ async function renderPayments() {
         </div>
         <span class="badge ${paid ? 'badge-green' : 'badge-gold'}">${escapeHtml(p.status)}</span>
       </div>
-      ${!paid ? `
-        <button class="btn btn-whatsapp btn-sm w-full wa-pay-btn">
-          <svg viewBox="0 0 24 24"
+      ${!paid ? `<button class="btn btn-whatsapp btn-sm w-full wa-pay-btn">Get payment details on WhatsApp</button>` :
+        `<div class="text-xs text-center py-2 rounded-xl" style="background: var(--green-dim); color: var(--green); font-weight:700;">✓ Payment completed</div>`}
+    `;
+    if (!paid) {
+      card.querySelector('.wa-pay-btn')?.addEventListener('click', () => {
+        if (order) openWhatsAppForOrder(order);
+        else openWhatsAppGeneric();
+      });
+    }
+    el.appendChild(card);
+  });
+}
+
+/* =============================================================
+   RENDER: MARKET
+   ============================================================= */
+async function renderMarket() {
+  state.listings = await db.listListings();
+  const q = ($('market-search')?.value || '').toLowerCase().trim();
+  let items = state.listings;
+  if (q) items = items.filter(l =>
+    (String(l.title||'') + ' ' + String(l.description||'')).toLowerCase().includes(q));
+  const grid = $('market-grid'); if (!grid) return;
+  if (!items.length) {
+    grid.innerHTML = `<div class="col-span-full empty-state">No listings yet.<br/>Be the first to list a pre-loved piece.</div>`;
+    return;
+  }
+  grid.innerHTML = items.map(l => `
+    <div class="surface overflow-hidden group">
+      <div class="aspect-square flex items-center justify-center text-5xl" style="background: var(--surface-2); color: rgba(242,237,225,.15);">
+        ${l.image_url
+          ? `<img src="${escapeHtml(l.image_url)}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" onerror="this.style.display='none';this.parentElement.textContent='👜'" />`
+          : '👜'}
+      </div>
+      <div class="p-4">
+        <div class="font-bold text-sm truncate">${escapeHtml(l.title)}</div>
+        <div class="text-xs truncate mt-0.5" style="color: var(--text-3);">${escapeHtml(l.size||'')} · ${escapeHtml(l.condition||'')}</div>
+        <div class="flex items-center justify-between mt-3">
+          <div class="font-black text-base" style="color: var(--gold);">${money(l.price)}</div>
+          <span class="badge ${l.status==='available'?'badge-green':'badge-gray'}">${escapeHtml(l.status)}</span>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+/* =============================================================
+   RENDER: APPLICATIONS
+   ============================================================= */
+async function renderApplications() {
+  state.applications = await db.listApplications();
+  const el = $('apps-list'); if (!el) return;
+  if (!state.applications.length) {
+    el.innerHTML = `<li class="empty-state">No applications yet.</li>`;
+    return;
+  }
+  el.innerHTML = state.applications.map(a => `
+    <li class="surface-2 p-4">
+      <div class="flex items-start justify-between gap-3">
+        <div class="min-w-0">
+          <div class="font-bold text-sm">${escapeHtml(a.full_name||'Applicant')}</div>
+          <div class="text-xs truncate mt-0.5" style="color: var(--text-3);">${escapeHtml(a.email||'')} · ${a.years_experience || 0} yr exp</div>
+          ${a.portfolio_url
+            ? `<a href="${escapeHtml(a.portfolio_url)}" target="_blank" rel="noopener" class="text-xs underline mt-1 inline-block" style="color: var(--gold);">Portfolio →</a>`
+            : ''}
+        </div>
+        <span class="badge ${a.status==='accepted'?'badge-green':a.status==='rejected'?'badge-red':'badge-gold'}">${escapeHtml(a.status)}</span>
+      </div>
+    </li>
+  `).join('');
+}
+
+/* =============================================================
+   FORM HANDLERS
+   ============================================================= */
+async function submitOrder(e) {
+  e.preventDefault();
+  const clientPicker = state.pickers.client;
+  const contact = clientPicker ? clientPicker.getValue() : {};
+  const payload = {
+    client_id: state.user.id,
+    garment_type: $('order-garment')?.value || '',
+    description:  $('order-desc')?.value.trim() || '',
+    pinterest_url:$('order-pinterest')?.value.trim() || '',
+    measurements: {
+      bust:  $('m-bust')?.value  ? Number($('m-bust').value)  : null,
+      waist: $('m-waist')?.value ? Number($('m-waist').value) : null,
+      hips:  $('m-hips')?.value  ? Number($('m-hips').value)  : null
+    },
+    budget: Number($('order-budget')?.value) || 0,
+    client_whatsapp: contact.whatsapp || '',
+    client_country:  contact.country_iso || '',
+    client_state:    contact.state || '',
+    milestone: 1, status: 'pending'
+  };
+  if (!payload.garment_type) return toast('Please select a garment type.', 'error');
+  const row = await db.createOrder(payload);
+  state.orders.unshift(row);
+  e.target.reset();
+  $('pinterest-picker')?.classList.add('hidden');
+  renderOrders();
+  toast('Bespoke order submitted.', 'success');
+}
+
+async function submitListing(e) {
+  e.preventDefault();
+  const payload = {
+    seller_id:   state.user.id,
+    seller_name: state.user.full_name,
+    title:       $('list-title')?.value.trim() || '',
+    description: $('list-desc')?.value.trim() || '',
+    price:       Number($('list-price')?.value) || 0,
+    size:        $('list-size')?.value.trim() || '',
+    condition:   $('list-condition')?.value || '',
+    image_url:   $('list-image')?.value.trim() || '',
+    status:      'available'
+  };
+  if (!payload.title || !payload.price) return toast('Title and price required.', 'error');
+  const row = await db.createListing(payload);
+  state.listings.unshift(row);
+  e.target.reset();
+  renderMarket();
+  toast('Listing published.', 'success');
+}
+
+async function submitApplication(e) {
+  e.preventDefault();
+  const payload = {
+    applicant_id: state.user.id,
+    mentor_id:    null,
+    full_name:    $('app-name')?.value.trim() || '',
+    email:        $('app-email')?.value.trim() || '',
+    portfolio_url:$('app-portfolio')?.value.trim() || '',
+    cover_letter: $('app-cover')?.value.trim() || '',
+    years_experience: Number($('app-years')?.value) || 0,
+    status: 'pending'
+  };
+  if (!payload.full_name || !payload.email) return toast('Name and email are required.', 'error');
+  const row = await db.createApplication(payload);
+  state.applications.unshift(row);
+  e.target.reset();
+  renderApplications();
+  toast('Application submitted.', 'success');
+}
+
+/* =============================================================
+   REFRESH
+   ============================================================= */
+async function refreshAll() {
+  if (!state.user) return;
+  try {
+    state.orders       = await db.listOrders();
+    state.listings     = await db.listListings();
+    state.applications = await db.listApplications();
+    state.payments     = await db.listPayments();
+    renderOrders();
+    renderMarket();
+    renderApplications();
+    renderPayments();
+  } catch (err) {
+    console.error('[StitchLuxe] refresh error', err);
+  }
+}
+
+/* =============================================================
+   INIT
+   ============================================================= */
+function init() {
+  const yearEl = $('footer-year');
+  if (yearEl) yearEl.textContent = new Date().getFullYear();
+  console.log('[StitchLuxe] init · mode:', useLocal ? 'LOCAL' : 'SUPABASE');
+
+  // Set up phone pickers
+  state.pickers.client = createPhonePicker($('client-phone-picker'), { defaultCountry: 'NG' });
+  state.pickers.tailor = createPhonePicker($('tailor-phone-picker'), {
+    defaultCountry: 'NG',
+    onChange: (v) => {
+      const preview = $('tailor-number-preview');
+      if (preview) preview.textContent = v.whatsapp ? '+' + v.whatsapp : '+234 ...';
+    }
+  });
+
+  try {
+    const saved = lsRead(CONFIG.LS_SESSION, null);
+    if (saved?.id && saved?.email) {
+      console.log('[StitchLuxe] restoring session for', saved.email);
+      startSession(saved, null);
+      // reload profile in background
+      db.getProfile(saved.id).then(p => { if (p) { state.profile = p; updateTailorSetupBanner(); } });
+    }
+  } catch (e) { console.warn('[StitchLuxe] session restore failed:', e); }
+
+  // Auth
+  $('auth-form')?.addEventListener('submit', handleLogin);
+  $('btn-signup')?.addEventListener('click', handleSignup);
+  $('btn-demo')?.addEventListener('click', handleDemo);
+  $('btn-logout')?.addEventListener('click', handleLogout);
+
+  // Tabs
+  document.querySelectorAll('.tab-btn').forEach(b =>
+    b.addEventListener('click', () => switchTab(b.dataset.tab)));
+
+  // Forms
+  $('form-order')?.addEventListener('submit', submitOrder);
+  $('form-listing')?.addEventListener('submit', submitListing);
+  $('form-apprentice')?.addEventListener('submit', submitApplication);
+
+  // Search
+  $('order-search')?.addEventListener('input', renderOrders);
+  $('market-search')?.addEventListener('input', renderMarket);
+
+  // Pinterest reacts to garment select
+  $('order-garment')?.addEventListener('change', updatePinterestPicker);
+
+  // Modal
+  $('btn-close-order')?.addEventListener('click', () => {
+    $('modal-order')?.classList.add('hidden');
+    state.activeOrderId = null;
+  });
+  $('btn-send-chat')?.addEventListener('click', sendChat);
+  $('chat-input')?.addEventListener('keypress', e => { if (e.key === 'Enter') sendChat(); });
+  $('btn-ask-pay')?.addEventListener('click', askBestWayToPay);
+  $('btn-advance-ms')?.addEventListener('click', advanceMilestone);
+
+  // Generic WhatsApp button
+  $('btn-open-wa-generic')?.addEventListener('click', () => openWhatsAppGeneric());
+
+  // Tailor WhatsApp setup
+  $('btn-my-wa')?.addEventListener('click', () => openTailorWaModal());
+  $('btn-setup-wa')?.addEventListener('click', () => openTailorWaModal());
+  $('btn-close-tailor-wa')?.addEventListener('click', closeTailorWaModal);
+  $('btn-cancel-tailor-wa')?.addEventListener('click', closeTailorWaModal);
+  $('btn-save-tailor-wa')?.addEventListener('click', saveTailorWa);
+
+  // Hygiene
+  delete window.STITCHLUXE_SUPABASE_URL;
+  delete window.STITCHLUXE_SUPABASE_ANON_KEY;
+  delete window.STITCHLUXE_TAILOR_WHATSAPP;
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}
