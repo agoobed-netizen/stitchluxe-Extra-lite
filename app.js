@@ -63,7 +63,7 @@ let useLocal = true;
 
 if (CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY && window.supabase) {
   try {
-    supabase = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
+    sb = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
     useLocal = false;
   } catch (e) { console.warn('Supabase init failed, using local fallback', e); }
 }
