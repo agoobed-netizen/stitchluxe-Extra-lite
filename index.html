@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>StitchLuxe Extra Lite — Bespoke • Resale • Apprenticeship</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://js.paystack.co/v1/inline.js"></script>
 <style>
   :root { --gold: #c9a227; --ink: #0f0e0c; }
@@ -24,10 +24,9 @@
 </head>
 <body class="min-h-screen">
 
-<!-- TOAST -->
 <div id="toast-wrap" class="fixed top-4 right-4 z-[999] space-y-2"></div>
 
-<!-- =============== AUTH GATE =============== -->
+<!-- AUTH GATE -->
 <section id="auth-gate" class="min-h-screen flex items-center justify-center p-4">
   <div class="w-full max-w-md bg-white rounded-3xl shadow-xl p-8 border border-black/5">
     <div class="text-center mb-6">
@@ -83,9 +82,8 @@
   </div>
 </section>
 
-<!-- =============== APP SHELL =============== -->
-<div id="app-shell" class="hidden min-h-screen flex flex-col">
-  <!-- HEADER -->
+<!-- APP SHELL -->
+<div id="app-shell" class="hidden min-h-screen flex-col">
   <header class="bg-white border-b border-black/5 sticky top-0 z-40">
     <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
       <div class="text-xl font-black tracking-tight">Stitch<span class="gold">Luxe</span>
@@ -100,7 +98,6 @@
         <button id="btn-logout" class="text-xs text-black/60 hover:text-black border border-black/10 rounded-lg px-3 py-2">Logout</button>
       </div>
     </div>
-    <!-- TABS -->
     <nav class="max-w-6xl mx-auto px-4 pb-3 flex gap-2 scroll-x">
       <button data-tab="orders"     class="tab-btn tab-active whitespace-nowrap text-sm font-semibold px-4 py-2 rounded-full border border-black/10">🧵 Bespoke Orders</button>
       <button data-tab="market"     class="tab-btn whitespace-nowrap text-sm font-semibold px-4 py-2 rounded-full border border-black/10">👜 Resale Market</button>
@@ -111,10 +108,8 @@
 
   <main class="flex-1 max-w-6xl mx-auto w-full px-4 py-6 space-y-6">
 
-    <!-- =============== TAB: ORDERS =============== -->
     <section id="tab-orders" class="tab-panel space-y-6">
       <div class="grid md:grid-cols-2 gap-6">
-        <!-- New Order -->
         <div class="bg-white rounded-2xl border border-black/5 p-5 shadow-sm">
           <h2 class="font-bold text-lg mb-4">New Bespoke Order</h2>
           <form id="form-order" class="space-y-3">
@@ -163,7 +158,6 @@
           </form>
         </div>
 
-        <!-- Orders List -->
         <div class="bg-white rounded-2xl border border-black/5 p-5 shadow-sm">
           <div class="flex items-center justify-between mb-4">
             <h2 class="font-bold text-lg">Your Orders</h2>
@@ -175,7 +169,6 @@
       </div>
     </section>
 
-    <!-- =============== TAB: MARKETPLACE =============== -->
     <section id="tab-market" class="tab-panel hidden space-y-6">
       <div class="grid md:grid-cols-3 gap-6">
         <div class="bg-white rounded-2xl border border-black/5 p-5 shadow-sm md:col-span-1">
@@ -223,7 +216,6 @@
       </div>
     </section>
 
-    <!-- =============== TAB: APPRENTICESHIP =============== -->
     <section id="tab-apprentice" class="tab-panel hidden space-y-6">
       <div class="grid md:grid-cols-2 gap-6">
         <div class="bg-white rounded-2xl border border-black/5 p-5 shadow-sm">
@@ -259,7 +251,6 @@
       </div>
     </section>
 
-    <!-- =============== TAB: PAYMENTS =============== -->
     <section id="tab-payments" class="tab-panel hidden space-y-6">
       <div class="bg-white rounded-2xl border border-black/5 p-5 shadow-sm">
         <div class="flex items-center justify-between mb-4">
@@ -279,7 +270,7 @@
   </footer>
 </div>
 
-<!-- =============== ORDER DETAIL MODAL =============== -->
+<!-- ORDER MODAL -->
 <div id="modal-order" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm p-3 sm:p-6 overflow-y-auto">
   <div class="max-w-2xl mx-auto bg-white rounded-3xl shadow-2xl overflow-hidden">
     <div class="p-5 border-b border-black/5 flex items-start justify-between gap-4">
@@ -290,13 +281,11 @@
       <button id="btn-close-order" class="text-black/40 hover:text-black text-xl leading-none">✕</button>
     </div>
 
-    <!-- Milestones -->
     <div class="px-5 pt-4">
       <div class="text-[10px] uppercase font-bold tracking-wider text-black/40 mb-2">Production Milestones</div>
       <div id="milestone-bar" class="flex items-center gap-1"></div>
     </div>
 
-    <!-- Pinterest ref -->
     <div id="modal-pinterest-wrap" class="px-5 pt-4 hidden">
       <a id="modal-pinterest" href="#" target="_blank" rel="noopener"
          class="inline-flex items-center gap-2 text-xs bg-red-50 text-red-600 font-semibold px-3 py-2 rounded-full hover:bg-red-100">
@@ -304,19 +293,16 @@
       </a>
     </div>
 
-    <!-- Measurements -->
     <div class="px-5 pt-4">
       <div class="text-[10px] uppercase font-bold tracking-wider text-black/40 mb-1">Measurements</div>
       <div id="modal-measurements" class="text-sm text-black/70">—</div>
     </div>
 
-    <!-- Chat -->
     <div class="px-5 pt-5 pb-2">
       <div class="text-[10px] uppercase font-bold tracking-wider text-black/40 mb-2">Order Chat</div>
       <div id="chat-log" class="bg-[#faf8f3] rounded-2xl p-4 h-72 overflow-y-auto space-y-3 text-sm"></div>
     </div>
 
-    <!-- Actions -->
     <div class="px-5 pb-3 flex flex-wrap gap-2">
       <button id="btn-ask-pay" class="text-xs bg-[#c9a227] text-black font-semibold px-3 py-2 rounded-full hover:opacity-90">
         💬 Ask tailor best way to pay
@@ -329,14 +315,12 @@
       </button>
     </div>
 
-    <!-- Chat input -->
     <div class="border-t border-black/5 p-4 flex gap-2 bg-white">
       <input id="chat-input" placeholder="Type a message…"
              class="flex-1 px-4 py-2.5 rounded-xl border border-black/10 bg-[#faf8f3] text-sm" />
       <button id="btn-send-chat" class="bg-black text-white text-sm font-semibold px-4 rounded-xl">Send</button>
     </div>
 
-    <!-- Payment request inline form (tailor only) -->
     <div id="pay-request-form" class="hidden border-t border-black/5 p-4 bg-[#faf8f3] space-y-2">
       <div class="text-xs font-bold uppercase text-black/60">Request Payment</div>
       <div class="grid grid-cols-3 gap-2">
@@ -357,11 +341,13 @@
     </div>
   </div>
 </div>
+
+<!-- CONFIG — paste your real values here -->
 <script>
-  window.STITCHLUXE_SUPABASE_URL      = 'https://agoobed-netizen.github.io/stitchluxe-Extra-lite/';
-  window.STITCHLUXE_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl0ZXhmdGluemNtd2NieWNrdWFzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkwNDI2OTMsImV4cCI6MjEwNDYxODY5M30.XLw9Sy6ZY7q9zMpMNcRjMU91t403CXUKH27sjrxYmJU ';
-  window.STITCHLUXE_PAYSTACK_KEY      = 'pk_test_xxxxxxxxxxxxxxxxxxxxxxxx';
+  window.STITCHLUXE_SUPABASE_URL      = 'PASTE_YOUR_SUPABASE_URL_HERE';
+  window.STITCHLUXE_SUPABASE_ANON_KEY = 'PASTE_YOUR_SUPABASE_ANON_KEY_HERE';
+  window.STITCHLUXE_PAYSTACK_KEY      = 'PASTE_YOUR_PAYSTACK_PUBLIC_KEY_HERE';
 </script>
-<script src="app.js"></script>
+<script src="app.js?v=4"></script>
 </body>
 </html>
