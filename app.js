@@ -7,7 +7,7 @@
 const CONFIG = {
   SUPABASE_URL:      window.STITCHLUXE_SUPABASE_URL      || '',      // e.g. https://xxxx.supabase.co
   SUPABASE_ANON_KEY: window.STITCHLUXE_SUPABASE_ANON_KEY || '',      // anon public key
-  PAYSTACK_PUBLIC_KEY: window.STITCHLUXE_PAYSTACK_KEY    || 'pk_test_xxxxxxxxxxxxxxxxxxxxxxxx',
+  PAYSTACK_PUBLIC_KEY: window.STITCHLUXE_PAYSTACK_KEY    || 'pk_test_xxAxxxxxxxxxxxxxxxxxxxxxx',
   LS_KEY: 'stitchluxe_extra_lite_v1',
   LS_SESSION: 'stitchluxe_session_v1'
 };
