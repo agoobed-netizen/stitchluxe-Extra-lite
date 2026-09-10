@@ -3,310 +3,219 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>StitchLuxe Extra Lite — Bespoke • Resale • Apprenticeship</title>
+<title>StitchLuxe — Bespoke • Resale • Apprenticeship</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root {
-    --gold: #c9a227;
-    --gold-soft: #f5ecd0;
-    --ink: #0f0e0c;
-    --ink-soft: #2b2823;
-    --cream: #faf8f3;
-    --cream-2: #f3efe4;
-    --line: rgba(15,14,12,.08);
+    --bg: #0a0805;
+    --surface: #14110a;
+    --surface-2: #1c1810;
+    --surface-3: #242018;
+    --gold: #d4af37;
+    --gold-hi: #e8c860;
+    --gold-dim: rgba(212, 175, 55, 0.14);
+    --gold-line: rgba(212, 175, 55, 0.28);
+    --text: #f2ede1;
+    --text-2: rgba(242, 237, 225, 0.72);
+    --text-3: rgba(242, 237, 225, 0.42);
+    --line: rgba(242, 237, 225, 0.08);
+    --green: #4ade80;
+    --green-dim: rgba(74, 222, 128, 0.14);
+    --red: #f87171;
+    --red-dim: rgba(248, 113, 113, 0.14);
   }
-  * { -webkit-tap-highlight-color: transparent; }
+  * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
+  html, body { background: var(--bg); }
   body {
-    font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-    background: var(--cream);
-    color: var(--ink);
-    font-feature-settings: "ss01", "cv11";
+    font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Inter', sans-serif;
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
   }
-  .serif { font-family: 'Playfair Display', Georgia, serif; }
-  .gold { color: var(--gold); }
-  .brand-mark {
-    background: linear-gradient(135deg, var(--ink) 0%, #35302a 100%);
-    color: #fff;
-    padding: 2px 10px 4px;
-    border-radius: 10px;
-    display: inline-block;
-    line-height: 1;
+  .serif { font-family: 'Playfair Display', Georgia, 'Times New Roman', serif; letter-spacing: -0.01em; }
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background:
+      radial-gradient(1200px 600px at 20% -10%, rgba(212,175,55,.08), transparent 60%),
+      radial-gradient(900px 500px at 90% 110%, rgba(212,175,55,.05), transparent 55%);
+    pointer-events: none; z-index: 0;
   }
-  .brand-mark .gold { color: var(--gold); }
+  .app-layer { position: relative; z-index: 1; }
+  .brand { font-weight: 900; letter-spacing: -0.02em; color: var(--text); }
+  .brand .gold { color: var(--gold); }
 
-  /* Cards & surfaces */
   .surface {
-    background: #fff;
+    background: linear-gradient(180deg, var(--surface) 0%, #100d07 100%);
     border: 1px solid var(--line);
     border-radius: 22px;
-    box-shadow: 0 1px 2px rgba(15,14,12,.03), 0 12px 32px -20px rgba(15,14,12,.15);
+    box-shadow: 0 1px 0 rgba(255,255,255,0.03) inset, 0 20px 40px -30px rgba(0,0,0,0.9);
   }
-  .surface-soft {
-    background: linear-gradient(180deg, #fff 0%, #fbf9f2 100%);
-    border: 1px solid var(--line);
-    border-radius: 22px;
-  }
+  .surface-2 { background: var(--surface-2); border: 1px solid var(--line); border-radius: 18px; }
+  .hr-gold { height: 1px; background: linear-gradient(90deg, transparent, var(--gold-line), transparent); border: none; margin: 20px 0; }
 
-  /* Inputs */
   .field {
-    width: 100%;
-    padding: 12px 16px;
-    border-radius: 14px;
+    width: 100%; padding: 13px 16px; border-radius: 14px;
     border: 1.5px solid var(--line);
-    background: var(--cream);
-    font-size: 15px;
-    transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
+    background: #0d0b06; color: var(--text);
+    font-size: 15px; font-family: inherit;
+    transition: border-color .15s, background .15s, box-shadow .15s;
   }
-  .field:focus {
-    outline: none;
-    border-color: var(--gold);
-    background: #fff;
-    box-shadow: 0 0 0 4px rgba(201,162,39,.12);
+  .field::placeholder { color: var(--text-3); }
+  .field:focus { outline: none; border-color: var(--gold); background: #100d07; box-shadow: 0 0 0 4px rgba(212,175,55,.14); }
+  select.field { appearance: none; background-image:
+    linear-gradient(45deg, transparent 50%, var(--gold) 50%),
+    linear-gradient(135deg, var(--gold) 50%, transparent 50%);
+    background-position: calc(100% - 20px) 50%, calc(100% - 14px) 50%;
+    background-size: 6px 6px, 6px 6px;
+    background-repeat: no-repeat; padding-right: 40px;
   }
   .field-label {
-    font-size: 11px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: .08em;
-    color: rgba(15,14,12,.55);
-    margin-bottom: 6px;
-    display: block;
+    font-size: 10px; font-weight: 800; letter-spacing: .14em;
+    text-transform: uppercase; color: var(--text-3);
+    margin-bottom: 6px; display: block;
   }
 
-  /* Buttons */
-  .btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    font-weight: 600;
-    font-size: 14px;
-    padding: 12px 18px;
-    border-radius: 14px;
-    transition: transform .08s ease, opacity .15s ease, background .15s ease;
-    cursor: pointer;
-    border: none;
-  }
-  .btn:active { transform: scale(.98); }
-  .btn-primary { background: var(--ink); color: #fff; }
-  .btn-primary:hover { background: #000; }
-  .btn-gold { background: var(--gold); color: #1a1508; }
-  .btn-gold:hover { background: #d4ae2f; }
-  .btn-ghost {
-    background: transparent;
-    color: var(--ink);
+  /* Phone input row (dial-code + number) */
+  .phone-row {
+    display: flex; align-items: stretch;
     border: 1.5px solid var(--line);
+    border-radius: 14px; overflow: hidden;
+    background: #0d0b06;
+    transition: border-color .15s, box-shadow .15s;
   }
-  .btn-ghost:hover { background: var(--cream-2); }
+  .phone-row:focus-within { border-color: var(--gold); box-shadow: 0 0 0 4px rgba(212,175,55,.14); }
+  .phone-row .dial-code {
+    padding: 13px 14px;
+    background: rgba(212,175,55,.08);
+    color: var(--gold);
+    font-weight: 800;
+    font-family: ui-monospace, monospace;
+    border-right: 1px solid var(--line);
+    display: flex; align-items: center; justify-content: center;
+    min-width: 72px; font-size: 14px; letter-spacing: .02em;
+  }
+  .phone-row .phone-number {
+    flex: 1; background: transparent; border: none;
+    color: var(--text); padding: 13px 14px;
+    font-size: 15px; font-family: ui-monospace, monospace;
+    outline: none; min-width: 0;
+  }
+  .phone-row .phone-number::placeholder { color: var(--text-3); font-family: inherit; }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    font-weight: 700; font-size: 14px; padding: 12px 20px; border-radius: 14px;
+    border: none; cursor: pointer; font-family: inherit; text-decoration: none;
+    transition: transform .08s, background .15s, box-shadow .15s, filter .15s;
+  }
+  .btn:active { transform: translateY(1px); }
+  .btn-gold { background: linear-gradient(180deg, var(--gold) 0%, #b8922a 100%); color: #1a1406; box-shadow: 0 8px 20px -10px rgba(212,175,55,.7); }
+  .btn-gold:hover { background: linear-gradient(180deg, var(--gold-hi) 0%, var(--gold) 100%); }
+  .btn-outline { background: transparent; color: var(--text); border: 1.5px solid var(--line); }
+  .btn-outline:hover { background: var(--surface-2); border-color: var(--gold-line); }
+  .btn-whatsapp { background: linear-gradient(180deg, #25D366 0%, #128C7E 100%); color: #fff; box-shadow: 0 8px 22px -10px rgba(37,211,102,.6); }
+  .btn-whatsapp:hover { filter: brightness(1.06); }
+  .btn-pinterest { background: linear-gradient(180deg, #e60023 0%, #b8001c 100%); color: #fff; box-shadow: 0 8px 22px -10px rgba(230,0,35,.6); }
+  .btn-pinterest:hover { filter: brightness(1.08); }
   .btn-sm { padding: 9px 14px; font-size: 13px; border-radius: 12px; }
 
-  /* Tabs */
   .tab-btn {
-    position: relative;
-    font-size: 13px;
-    font-weight: 600;
-    padding: 10px 16px;
-    border-radius: 999px;
-    border: 1.5px solid var(--line);
-    background: #fff;
-    color: var(--ink);
-    white-space: nowrap;
-    transition: all .18s ease;
+    font-size: 13px; font-weight: 700; padding: 10px 18px;
+    border-radius: 999px; border: 1.5px solid var(--line);
+    background: var(--surface); color: var(--text-2);
+    white-space: nowrap; transition: all .18s; cursor: pointer; font-family: inherit;
   }
-  .tab-btn:hover { background: var(--cream-2); }
+  .tab-btn:hover { color: var(--text); border-color: var(--gold-line); }
   .tab-btn.tab-active {
-    background: var(--ink);
-    color: #fff;
-    border-color: var(--ink);
-    box-shadow: 0 6px 16px -8px rgba(15,14,12,.5);
+    background: linear-gradient(180deg, var(--gold) 0%, #b8922a 100%);
+    color: #1a1406; border-color: var(--gold);
+    box-shadow: 0 8px 20px -10px rgba(212,175,55,.6);
   }
 
-  /* Badges */
-  .badge {
-    display: inline-flex;
-    align-items: center;
-    padding: 4px 10px;
-    border-radius: 999px;
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: .02em;
-    text-transform: capitalize;
-  }
-  .badge-gold   { background: var(--gold-soft); color: #7a5c0f; }
-  .badge-green  { background: #dcf5e4; color: #146c3a; }
-  .badge-red    { background: #fce0e0; color: #8b2020; }
-  .badge-gray   { background: rgba(15,14,12,.06); color: rgba(15,14,12,.6); }
+  .badge { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 999px; font-size: 10.5px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+  .badge-gold { background: var(--gold-dim); color: var(--gold-hi); border: 1px solid var(--gold-line); }
+  .badge-green { background: var(--green-dim); color: var(--green); border: 1px solid rgba(74,222,128,.3); }
+  .badge-red { background: var(--red-dim); color: var(--red); border: 1px solid rgba(248,113,113,.3); }
+  .badge-gray { background: rgba(242,237,225,.06); color: var(--text-2); border: 1px solid var(--line); }
 
-  /* Milestones */
-  .ms-step {
-    flex: 1;
-    text-align: center;
-    font-size: 10px;
-    font-weight: 700;
-    padding: 8px 4px;
-    border-radius: 10px;
-    background: rgba(15,14,12,.05);
-    color: rgba(15,14,12,.5);
-    transition: all .2s ease;
-    line-height: 1.15;
-  }
-  .ms-step.done   { background: var(--gold-soft); color: #7a5c0f; }
-  .ms-step.active { background: var(--ink); color: #fff; }
+  .ms-step { flex: 1; text-align: center; font-size: 10px; font-weight: 700; padding: 9px 4px; border-radius: 10px; background: rgba(242,237,225,.04); color: var(--text-3); transition: all .2s; line-height: 1.2; border: 1px solid transparent; }
+  .ms-step.done { background: var(--gold-dim); color: var(--gold-hi); border-color: var(--gold-line); }
+  .ms-step.active { background: linear-gradient(180deg, var(--gold) 0%, #b8922a 100%); color: #1a1406; border-color: var(--gold); }
 
-  /* Order cards */
-  .order-card {
-    background: #fff;
-    border: 1px solid var(--line);
-    border-radius: 18px;
-    padding: 16px;
-    cursor: pointer;
-    transition: transform .12s ease, box-shadow .18s ease, border-color .18s ease;
-  }
-  .order-card:hover {
-    transform: translateY(-2px);
-    border-color: rgba(201,162,39,.5);
-    box-shadow: 0 14px 28px -18px rgba(15,14,12,.25);
-  }
+  .order-card { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 18px; cursor: pointer; transition: transform .14s, border-color .18s, background .18s, box-shadow .18s; }
+  .order-card:hover { transform: translateY(-2px); border-color: var(--gold-line); background: var(--surface-2); box-shadow: 0 20px 40px -30px rgba(212,175,55,.3); }
 
-  /* Pinterest button */
-  .pin-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 10px 16px;
-    border-radius: 999px;
-    background: #e60023;
-    color: #fff !important;
-    font-weight: 700;
-    font-size: 13px;
-    text-decoration: none;
-    box-shadow: 0 8px 20px -10px rgba(230,0,35,.6);
-    transition: transform .1s ease, background .15s ease;
-  }
-  .pin-btn:hover { background: #cc001f; transform: translateY(-1px); }
-  .pin-btn svg { width: 16px; height: 16px; }
+  .bubble-me { background: linear-gradient(180deg, var(--gold) 0%, #b8922a 100%); color: #1a1406; border-radius: 16px 16px 4px 16px; padding: 11px 15px; max-width: 85%; font-size: 14px; font-weight: 500; }
+  .bubble-them { background: var(--surface-2); border: 1px solid var(--line); border-radius: 16px 16px 16px 4px; padding: 11px 15px; max-width: 85%; font-size: 14px; }
+  .empty-state { text-align: center; padding: 40px 20px; color: var(--text-3); font-size: 14px; line-height: 1.6; }
 
-  /* Bank picker grid */
-  .bank-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-    gap: 8px;
-    margin-top: 8px;
-  }
-  .bank-chip {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 10px 12px;
-    border-radius: 12px;
-    border: 1.5px solid var(--line);
-    background: #fff;
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all .15s ease;
-  }
-  .bank-chip:hover { border-color: var(--gold); background: var(--cream); }
-  .bank-chip.selected {
-    border-color: var(--gold);
-    background: var(--gold-soft);
-    color: #7a5c0f;
-  }
-  .bank-dot {
-    width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
-  }
-
-  /* USSD code box */
-  .ussd-code {
-    font-family: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
-    font-size: 18px;
-    font-weight: 700;
-    letter-spacing: .02em;
-    background: var(--ink);
-    color: #fff;
-    padding: 16px;
-    border-radius: 14px;
-    text-align: center;
-    word-break: break-all;
-    position: relative;
-  }
-  .ussd-code .pin { color: var(--gold); }
-
-  /* Payment card in chat */
-  .pay-card {
-    max-width: 92%;
-    background: #fff;
-    border: 1.5px solid rgba(201,162,39,.4);
-    border-radius: 20px;
-    padding: 16px;
-    box-shadow: 0 14px 32px -20px rgba(201,162,39,.6);
-  }
-
-  /* Chat bubbles */
-  .bubble-me {
-    background: var(--ink);
-    color: #fff;
-    border-radius: 16px 16px 4px 16px;
-    padding: 10px 14px;
-    max-width: 85%;
-    font-size: 14px;
-  }
-  .bubble-them {
-    background: #fff;
-    border: 1px solid var(--line);
-    border-radius: 16px 16px 16px 4px;
-    padding: 10px 14px;
-    max-width: 85%;
-    font-size: 14px;
-  }
-
-  /* Empty state */
-  .empty-state {
-    text-align: center;
-    padding: 32px 16px;
-    color: rgba(15,14,12,.4);
-    font-style: italic;
-    font-size: 14px;
-  }
-
-  /* Toast */
   .toast { animation: slideIn .3s cubic-bezier(.2,.9,.3,1.2); }
-  @keyframes slideIn {
-    from { transform: translateY(-16px); opacity: 0; }
-    to   { transform: translateY(0);     opacity: 1; }
-  }
+  @keyframes slideIn { from { transform: translateY(-16px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
   .hidden { display: none !important; }
   .scroll-x { overflow-x: auto; scrollbar-width: none; }
   .scroll-x::-webkit-scrollbar { display: none; }
-  .scroll-y { overflow-y: auto; }
+  .scroll-y { overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--gold-line) transparent; }
   .scroll-y::-webkit-scrollbar { width: 6px; }
-  .scroll-y::-webkit-scrollbar-thumb { background: rgba(15,14,12,.15); border-radius: 999px; }
+  .scroll-y::-webkit-scrollbar-thumb { background: var(--gold-line); border-radius: 999px; }
 
-  /* Copy feedback */
-  .copy-ok { background: #dcf5e4 !important; color: #146c3a !important; border-color: #146c3a !important; }
-
-  @media (min-width: 640px) {
-    body { font-size: 15px; }
+  .wa-card {
+    background: linear-gradient(135deg, #0f2e1e 0%, #0a1f14 100%);
+    border: 1px solid rgba(37,211,102,.35);
+    border-radius: 22px; padding: 24px;
+    position: relative; overflow: hidden;
   }
+  .wa-card::before {
+    content: ''; position: absolute; top: -50px; right: -50px;
+    width: 180px; height: 180px;
+    background: radial-gradient(circle, rgba(37,211,102,.25), transparent 70%);
+    pointer-events: none;
+  }
+
+  .pin-hint {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 14px;
+    background: rgba(230,0,35,.08);
+    border: 1px solid rgba(230,0,35,.25);
+    border-radius: 14px;
+    font-size: 12.5px;
+    color: rgba(242,237,225,.85);
+    line-height: 1.4;
+  }
+
+  /* Setup banner for tailors */
+  .setup-banner {
+    background: linear-gradient(135deg, rgba(212,175,55,.18) 0%, rgba(212,175,55,.06) 100%);
+    border: 1px solid var(--gold-line);
+    border-radius: 18px;
+    padding: 16px 20px;
+    display: flex; align-items: center; gap: 14px;
+    flex-wrap: wrap;
+  }
+
+  input[type=number]::-webkit-inner-spin-button,
+  input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+  input[type=number] { -moz-appearance: textfield; }
 </style>
 </head>
-<body class="min-h-screen">
+<body>
+<div class="app-layer">
 
 <div id="toast-wrap" class="fixed top-4 right-4 z-[999] space-y-2 max-w-[90vw]"></div>
 
-<!-- ============ AUTH GATE ============ -->
+<!-- ========== AUTH GATE ========== -->
 <section id="auth-gate" class="min-h-screen flex items-center justify-center p-4">
   <div class="w-full max-w-md surface p-8">
-    <div class="text-center mb-7">
-      <div class="brand-mark text-2xl font-black tracking-tight">
-        Stitch<span class="gold">Luxe</span>
-      </div>
-      <p class="text-[10px] uppercase tracking-[.25em] text-black/40 mt-3">Extra Lite • v2.2</p>
-      <p class="text-xs text-black/50 mt-2 serif italic">Bespoke • Resale • Apprenticeship</p>
+    <div class="text-center mb-8">
+      <div class="brand text-3xl">Stitch<span class="gold">Luxe</span></div>
+      <div class="text-[10px] uppercase tracking-[.35em] text-[color:var(--text-3)] mt-3">Atelier · Lagos</div>
+      <hr class="hr-gold" />
+      <p class="text-xs text-[color:var(--text-2)] serif italic text-base">Bespoke · Resale · Apprenticeship</p>
     </div>
-    <div id="auth-error" class="hidden mb-4 text-sm text-red-700 bg-red-50 border border-red-100 rounded-xl p-3"></div>
+    <div id="auth-error" class="hidden mb-4 text-sm rounded-xl p-3"
+         style="background: var(--red-dim); color: var(--red); border: 1px solid rgba(248,113,113,.3);"></div>
     <form id="auth-form" class="space-y-4">
       <div>
         <label for="auth-name" class="field-label">Full name (signup only)</label>
@@ -327,77 +236,115 @@
           <option value="tailor">Master Tailor — Admin</option>
         </select>
       </div>
-      <button id="btn-login" type="submit" class="btn btn-primary w-full">Sign In</button>
+      <button id="btn-login" type="submit" class="btn btn-gold w-full">Sign In</button>
       <div class="flex gap-2">
-        <button id="btn-signup" type="button" class="btn btn-ghost flex-1">Create Account</button>
-        <button id="btn-demo" type="button" class="btn btn-gold flex-1">Demo User</button>
+        <button id="btn-signup" type="button" class="btn btn-outline flex-1">Create Account</button>
+        <button id="btn-demo" type="button" class="btn btn-outline flex-1">Demo</button>
       </div>
-      <div class="text-[11px] text-center text-black/40 leading-relaxed pt-3 border-t border-black/5">
-        <span class="font-semibold">Demo:</span> <span class="font-mono">designer@stitchluxe.com</span> ·
-        <span class="font-semibold">Admin:</span> <span class="font-mono">mastertailor@stitchluxe.com</span><br />
+      <div class="text-[11px] text-center text-[color:var(--text-3)] leading-relaxed pt-3 border-t border-[color:var(--line)]">
+        <span class="font-semibold text-[color:var(--text-2)]">Demo:</span>
+        <span class="font-mono">designer@stitchluxe.com</span><br />
+        <span class="font-semibold text-[color:var(--text-2)]">Admin:</span>
+        <span class="font-mono">mastertailor@stitchluxe.com</span><br />
         <span class="font-mono text-[10px]">password: stitchluxe123</span>
       </div>
     </form>
   </div>
 </section>
 
-<!-- ============ APP SHELL ============ -->
+<!-- ========== APP SHELL ========== -->
 <div id="app-shell" class="hidden min-h-screen flex-col">
 
-  <!-- HEADER -->
-  <header class="bg-white/95 backdrop-blur border-b border-black/5 sticky top-0 z-40">
-    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-      <div class="text-lg font-black tracking-tight brand-mark">
-        Stitch<span class="gold">Luxe</span>
-      </div>
-      <div class="flex items-center gap-3">
+  <header class="sticky top-0 z-40" style="background: rgba(10,8,5,.85); backdrop-filter: blur(14px); border-bottom: 1px solid var(--line);">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-2">
+      <div class="brand text-lg">Stitch<span class="gold">Luxe</span></div>
+      <div class="flex items-center gap-2">
         <div class="text-right hidden sm:block">
           <div id="user-name-display" class="text-sm font-semibold leading-tight">—</div>
-          <div id="user-role-display" class="text-[10px] uppercase tracking-wider text-black/40">—</div>
+          <div id="user-role-display" class="text-[10px] uppercase tracking-wider text-[color:var(--text-3)]">—</div>
         </div>
+        <button id="btn-my-wa" class="btn btn-outline btn-sm hidden" title="My WhatsApp number">📱 <span class="hidden sm:inline">My WhatsApp</span></button>
         <div id="user-avatar"
-             class="w-9 h-9 rounded-full bg-[#c9a227] text-black flex items-center justify-center font-bold text-sm shadow-sm">?</div>
-        <button id="btn-logout" class="btn btn-ghost btn-sm">Logout</button>
+             class="w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm"
+             style="background: linear-gradient(180deg, var(--gold) 0%, #b8922a 100%); color: #1a1406;">?</div>
+        <button id="btn-logout" class="btn btn-outline btn-sm">Logout</button>
       </div>
     </div>
     <nav class="max-w-6xl mx-auto px-4 pb-3 flex gap-2 scroll-x">
       <button data-tab="orders"     class="tab-btn tab-active">🧵 Bespoke</button>
       <button data-tab="market"     class="tab-btn">👜 Resale</button>
-      <button data-tab="apprentice" class="tab-btn">🎓 Apprenticeship</button>
-      <button data-tab="payments"   class="tab-btn">💳 Payments</button>
+      <button data-tab="apprentice" class="tab-btn">🎓 Apprentice</button>
+      <button data-tab="payments"   class="tab-btn">💬 Pay Tailor</button>
     </nav>
   </header>
 
   <main class="flex-1 max-w-6xl mx-auto w-full px-4 py-6 space-y-6">
 
-    <!-- ===== TAB: ORDERS ===== -->
+    <!-- Setup banner (tailors only, when number missing) -->
+    <div id="tailor-setup-banner" class="setup-banner hidden">
+      <div style="font-size:28px">📱</div>
+      <div class="flex-1 min-w-[200px]">
+        <div class="font-bold text-[color:var(--text)]">Add your WhatsApp number</div>
+        <div class="text-xs text-[color:var(--text-2)] mt-1">
+          Clients need a way to pay you. Set your country, state and WhatsApp — it takes 15 seconds.
+        </div>
+      </div>
+      <button id="btn-setup-wa" class="btn btn-gold btn-sm">Set now</button>
+    </div>
+
+    <!-- ===== ORDERS ===== -->
     <section id="tab-orders" class="tab-panel space-y-6">
       <div class="grid md:grid-cols-2 gap-6">
         <div class="surface p-6">
-          <div class="flex items-center gap-2 mb-5">
-            <div class="w-8 h-8 rounded-lg bg-[#0f0e0c] text-[#c9a227] flex items-center justify-center text-sm font-bold">✂</div>
-            <h2 class="font-bold text-lg serif">New Bespoke Order</h2>
+          <div class="flex items-center gap-3 mb-6">
+            <div class="w-9 h-9 rounded-xl flex items-center justify-center text-lg"
+                 style="background: linear-gradient(180deg, var(--gold) 0%, #b8922a 100%); color: #1a1406;">✂</div>
+            <div>
+              <h2 class="font-bold text-lg serif">New Bespoke Order</h2>
+              <p class="text-[11px] text-[color:var(--text-3)] uppercase tracking-wider">Commission a piece</p>
+            </div>
           </div>
           <form id="form-order" class="space-y-4">
             <div>
               <label for="order-garment" class="field-label">Garment type</label>
               <select id="order-garment" required class="field">
                 <option value="">Select…</option>
-                <option>Agbada</option><option>Ankara Gown</option><option>Kaftan</option>
-                <option>Bridal / Aso Ebi</option><option>Suit (2-piece)</option>
-                <option>Senator / Kaftan Set</option><option>Other</option>
+                <option>Agbada</option>
+                <option>Ankara Gown</option>
+                <option>Kaftan</option>
+                <option>Bridal / Aso Ebi</option>
+                <option>Suit (2-piece)</option>
+                <option>Senator Set</option>
+                <option>Other</option>
               </select>
+            </div>
+
+            <!-- Pinterest picker -->
+            <div id="pinterest-picker" class="pin-hint hidden">
+              <span style="font-size:20px">📌</span>
+              <div class="flex-1">
+                <div class="font-bold text-[color:var(--text)] text-[12px] mb-1">
+                  Pick a style on Pinterest first
+                </div>
+                <div class="text-[11px] mb-2">
+                  Browse <b id="pin-garment-name">styles</b> on Pinterest, save the pin URL, and paste it below.
+                </div>
+                <a id="pin-browse-btn" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-pinterest btn-sm">
+                  <svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px">
+                    <path d="M12.017 0C5.396 0 .029 5.367.029 11.987c0 5.079 3.158 9.417 7.618 11.162-.105-.949-.199-2.403.041-3.439.219-.937 1.406-5.957 1.406-5.957s-.359-.72-.359-1.781c0-1.663.967-2.911 2.168-2.911 1.024 0 1.518.769 1.518 1.688 0 1.029-.653 2.567-.992 3.992-.285 1.193.6 2.165 1.775 2.165 2.128 0 3.768-2.245 3.768-5.487 0-2.861-2.063-4.869-5.008-4.869-3.41 0-5.409 2.562-5.409 5.199 0 1.033.394 2.143.889 2.741.099.12.112.225.085.345-.09.375-.293 1.199-.334 1.363-.053.225-.172.271-.401.165-1.495-.69-2.433-2.878-2.433-4.646 0-3.776 2.748-7.252 7.92-7.252 4.158 0 7.392 2.967 7.392 6.923 0 4.135-2.607 7.462-6.233 7.462-1.214 0-2.354-.629-2.758-1.379l-.749 2.848c-.269 1.045-1.004 2.352-1.498 3.146 1.123.345 2.306.535 3.55.535 6.607 0 11.985-5.365 11.985-11.987C23.97 5.39 18.592.026 11.985.026L12.017 0z"/>
+                  </svg>
+                  Browse <span id="pin-browse-label">styles</span> on Pinterest
+                </a>
+              </div>
+            </div>
+
+            <div>
+              <label for="order-pinterest" class="field-label">Paste your Pinterest pin URL</label>
+              <input id="order-pinterest" type="url" class="field" placeholder="https://pin.it/..." />
             </div>
             <div>
               <label for="order-desc" class="field-label">Description / brief</label>
-              <textarea id="order-desc" rows="3" class="field" placeholder="Style details, colours, fabric preference…"></textarea>
-            </div>
-            <div>
-              <label for="order-pinterest" class="field-label">Pinterest reference URL</label>
-              <input id="order-pinterest" type="url" class="field" placeholder="https://pin.it/..." />
-              <p class="text-[11px] text-black/40 mt-1.5">
-                Paste a Pinterest pin or board link — you'll get a direct button to open it.
-              </p>
+              <textarea id="order-desc" rows="3" class="field" placeholder="Fabric, colours, occasion, fit notes…"></textarea>
             </div>
             <div class="grid grid-cols-3 gap-2">
               <div>
@@ -417,30 +364,66 @@
               <label for="order-budget" class="field-label">Budget (₦)</label>
               <input id="order-budget" type="number" min="0" step="500" class="field" placeholder="120000" />
             </div>
-            <button type="submit" class="btn btn-primary w-full">Submit Order</button>
+
+            <!-- Client contact (country + state + number) -->
+            <div style="border-top: 1px solid var(--line); padding-top: 16px;">
+              <div class="field-label" style="margin-bottom:10px;">Your contact</div>
+              <div class="space-y-3" id="client-phone-picker">
+                <div class="grid grid-cols-2 gap-2">
+                  <div>
+                    <label class="field-label">Country</label>
+                    <select class="field phone-country"></select>
+                  </div>
+                  <div>
+                    <label class="field-label">State / Region</label>
+                    <select class="field phone-state"></select>
+                    <input class="field phone-state-text hidden" placeholder="State / Region">
+                  </div>
+                </div>
+                <div>
+                  <label class="field-label">WhatsApp / phone number</label>
+                  <div class="phone-row">
+                    <span class="dial-code">+234</span>
+                    <input class="phone-number" placeholder="801 234 5678" inputmode="tel" autocomplete="tel" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <button type="submit" class="btn btn-gold w-full">Submit Order</button>
           </form>
         </div>
 
         <div class="surface p-6">
           <div class="flex items-center justify-between mb-5 gap-3">
-            <h2 class="font-bold text-lg serif">Your Orders</h2>
+            <div>
+              <h2 class="font-bold text-lg serif">Your Orders</h2>
+              <p class="text-[11px] text-[color:var(--text-3)] uppercase tracking-wider">Tap to open</p>
+            </div>
             <input id="order-search" type="search" placeholder="Search…"
-                   class="field !w-36 !py-2 !text-sm" />
+                   class="field" style="width:140px;padding:8px 12px;font-size:13px" />
           </div>
-          <ul id="list-root" class="space-y-3 max-h-[560px] overflow-y-auto pr-1 scroll-y"></ul>
+          <ul id="list-root" class="space-y-3 max-h-[600px] overflow-y-auto pr-1 scroll-y"></ul>
         </div>
       </div>
     </section>
 
-    <!-- ===== TAB: MARKETPLACE ===== -->
+    <!-- ===== MARKET ===== -->
     <section id="tab-market" class="tab-panel hidden space-y-6">
       <div class="grid md:grid-cols-3 gap-6">
         <div class="surface p-6 md:col-span-1">
-          <h2 class="font-bold text-lg mb-5 serif">List an Item</h2>
+          <div class="flex items-center gap-3 mb-6">
+            <div class="w-9 h-9 rounded-xl flex items-center justify-center text-lg"
+                 style="background: linear-gradient(180deg, var(--gold) 0%, #b8922a 100%); color: #1a1406;">👜</div>
+            <div>
+              <h2 class="font-bold text-lg serif">List an Item</h2>
+              <p class="text-[11px] text-[color:var(--text-3)] uppercase tracking-wider">Pre-loved luxury</p>
+            </div>
+          </div>
           <form id="form-listing" class="space-y-4">
             <div>
               <label for="list-title" class="field-label">Title</label>
-              <input id="list-title" required class="field" />
+              <input id="list-title" required class="field" placeholder="Hermès silk scarf" />
             </div>
             <div>
               <label for="list-desc" class="field-label">Description</label>
@@ -466,25 +449,35 @@
               <label for="list-image" class="field-label">Image URL</label>
               <input id="list-image" type="url" class="field" placeholder="https://…" />
             </div>
-            <button type="submit" class="btn btn-primary w-full">Publish Listing</button>
+            <button type="submit" class="btn btn-gold w-full">Publish Listing</button>
           </form>
         </div>
         <div class="md:col-span-2">
           <div class="flex items-center justify-between mb-4 gap-3">
-            <h2 class="font-bold text-lg serif">Pre-loved Luxury</h2>
+            <div>
+              <h2 class="font-bold text-lg serif">Pre-loved Luxury</h2>
+              <p class="text-[11px] text-[color:var(--text-3)] uppercase tracking-wider">Curated resale</p>
+            </div>
             <input id="market-search" type="search" placeholder="Search items…"
-                   class="field !w-44 !py-2 !text-sm" />
+                   class="field" style="width:170px;padding:8px 12px;font-size:13px" />
           </div>
           <div id="market-grid" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
         </div>
       </div>
     </section>
 
-    <!-- ===== TAB: APPRENTICESHIP ===== -->
+    <!-- ===== APPRENTICE ===== -->
     <section id="tab-apprentice" class="tab-panel hidden space-y-6">
       <div class="grid md:grid-cols-2 gap-6">
         <div class="surface p-6">
-          <h2 class="font-bold text-lg mb-5 serif">Apply for Apprenticeship</h2>
+          <div class="flex items-center gap-3 mb-6">
+            <div class="w-9 h-9 rounded-xl flex items-center justify-center text-lg"
+                 style="background: linear-gradient(180deg, var(--gold) 0%, #b8922a 100%); color: #1a1406;">🎓</div>
+            <div>
+              <h2 class="font-bold text-lg serif">Apply for Apprenticeship</h2>
+              <p class="text-[11px] text-[color:var(--text-3)] uppercase tracking-wider">Learn couture</p>
+            </div>
+          </div>
           <form id="form-apprentice" class="space-y-4">
             <div>
               <label for="app-name" class="field-label">Full name</label>
@@ -506,22 +499,52 @@
               <label for="app-cover" class="field-label">Cover letter</label>
               <textarea id="app-cover" rows="4" class="field"></textarea>
             </div>
-            <button type="submit" class="btn btn-primary w-full">Submit Application</button>
+            <button type="submit" class="btn btn-gold w-full">Submit Application</button>
           </form>
         </div>
         <div class="surface p-6">
-          <h2 class="font-bold text-lg mb-5 serif">Applications</h2>
+          <h2 class="font-bold text-lg serif mb-5">Applications</h2>
           <ul id="apps-list" class="space-y-3"></ul>
         </div>
       </div>
     </section>
 
-    <!-- ===== TAB: PAYMENTS ===== -->
+    <!-- ===== PAY TAILOR ===== -->
     <section id="tab-payments" class="tab-panel hidden space-y-6">
+      <div class="wa-card">
+        <div class="relative">
+          <div class="flex items-start gap-4 mb-5">
+            <div class="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0"
+                 style="background: linear-gradient(180deg, #25D366 0%, #128C7E 100%);">
+              <svg viewBox="0 0 24 24" fill="#fff" style="width:28px;height:28px">
+                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
+              </svg>
+            </div>
+            <div class="flex-1 min-w-0">
+              <h2 class="font-bold text-xl serif text-white">Pay your tailor on WhatsApp</h2>
+              <p class="text-sm mt-1" style="color: rgba(255,255,255,.75); line-height: 1.55;">
+                We don't hold your money. We connect you directly to your tailor on WhatsApp —
+                they'll tell you the best way to send payment: <b style="color: #fff">bank transfer</b>,
+                <b style="color: #fff">USSD</b>, or <b style="color: #fff">cash on delivery</b>.
+              </p>
+            </div>
+          </div>
+          <button id="btn-open-wa-generic" class="btn btn-whatsapp w-full sm:w-auto">
+            <svg viewBox="0 0 24 24" fill="currentColor" style="width:18px;height:18px">
+              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347"/>
+            </svg>
+            Chat with tailor on WhatsApp
+          </button>
+        </div>
+      </div>
+
       <div class="surface p-6">
         <div class="flex items-center justify-between mb-5 flex-wrap gap-2">
-          <h2 class="font-bold text-lg serif">Payment Requests</h2>
-          <span class="text-xs text-black/50">Pay by USSD or bank transfer — no card needed</span>
+          <div>
+            <h2 class="font-bold text-lg serif">Payment History</h2>
+            <p class="text-[11px] text-[color:var(--text-3)] uppercase tracking-wider">Across all your orders</p>
+          </div>
+          <span class="badge badge-gold">No card required</span>
         </div>
         <div id="payments-list" class="space-y-4"></div>
       </div>
@@ -529,34 +552,38 @@
 
   </main>
 
-  <footer class="border-t border-black/5 py-6 mt-8">
-    <div class="max-w-6xl mx-auto px-4 text-center text-xs text-black/50">
-      © <span id="footer-year">2025</span> StitchLuxe Extra Lite · Lagos, Nigeria · <span class="serif italic">Made with ♥ for couture</span>
+  <footer class="py-8 mt-8" style="border-top: 1px solid var(--line);">
+    <div class="max-w-6xl mx-auto px-4 text-center">
+      <div class="brand text-base mb-2">Stitch<span class="gold">Luxe</span></div>
+      <div class="text-xs text-[color:var(--text-3)]">
+        © <span id="footer-year">2025</span> · Lagos, Nigeria · <span class="serif italic">Tailored with intention</span>
+      </div>
     </div>
   </footer>
 </div>
 
-<!-- ============ ORDER MODAL ============ -->
-<div id="modal-order" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm p-3 sm:p-6 overflow-y-auto">
+<!-- ========== ORDER MODAL ========== -->
+<div id="modal-order" class="hidden fixed inset-0 z-50 p-3 sm:p-6 overflow-y-auto"
+     style="background: rgba(0,0,0,.8); backdrop-filter: blur(8px);">
   <div class="max-w-2xl mx-auto surface overflow-hidden">
-    <div class="p-5 border-b border-black/5 flex items-start justify-between gap-4 sticky top-0 bg-white z-10">
+    <div class="p-5 flex items-start justify-between gap-4 sticky top-0 z-10"
+         style="background: var(--surface); border-bottom: 1px solid var(--line);">
       <div class="min-w-0">
-        <h3 id="modal-order-title" class="font-bold text-lg serif truncate">Order</h3>
-        <p id="modal-order-meta" class="text-xs text-black/50 mt-0.5">—</p>
+        <h3 id="modal-order-title" class="font-bold text-xl serif truncate">Order</h3>
+        <p id="modal-order-meta" class="text-xs text-[color:var(--text-3)] mt-1 uppercase tracking-wider">—</p>
       </div>
-      <button id="btn-close-order" class="text-black/40 hover:text-black text-2xl leading-none">✕</button>
+      <button id="btn-close-order" class="text-[color:var(--text-3)] hover:text-white text-2xl leading-none">✕</button>
     </div>
 
     <div class="px-5 pt-5">
-      <div class="text-[10px] uppercase font-bold tracking-[.15em] text-black/40 mb-2">Production Milestones</div>
+      <div class="field-label">Production Milestones</div>
       <div id="milestone-bar" class="flex items-center gap-1.5"></div>
     </div>
 
-    <!-- Pinterest CTA -->
     <div id="modal-pinterest-wrap" class="px-5 pt-5 hidden">
-      <div class="text-[10px] uppercase font-bold tracking-[.15em] text-black/40 mb-2">Design Reference</div>
-      <a id="modal-pinterest" href="#" target="_blank" rel="noopener" class="pin-btn">
-        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <div class="field-label">Design Reference</div>
+      <a id="modal-pinterest" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-pinterest">
+        <svg viewBox="0 0 24 24" fill="currentColor" style="width:16px;height:16px">
           <path d="M12.017 0C5.396 0 .029 5.367.029 11.987c0 5.079 3.158 9.417 7.618 11.162-.105-.949-.199-2.403.041-3.439.219-.937 1.406-5.957 1.406-5.957s-.359-.72-.359-1.781c0-1.663.967-2.911 2.168-2.911 1.024 0 1.518.769 1.518 1.688 0 1.029-.653 2.567-.992 3.992-.285 1.193.6 2.165 1.775 2.165 2.128 0 3.768-2.245 3.768-5.487 0-2.861-2.063-4.869-5.008-4.869-3.41 0-5.409 2.562-5.409 5.199 0 1.033.394 2.143.889 2.741.099.12.112.225.085.345-.09.375-.293 1.199-.334 1.363-.053.225-.172.271-.401.165-1.495-.69-2.433-2.878-2.433-4.646 0-3.776 2.748-7.252 7.92-7.252 4.158 0 7.392 2.967 7.392 6.923 0 4.135-2.607 7.462-6.233 7.462-1.214 0-2.354-.629-2.758-1.379l-.749 2.848c-.269 1.045-1.004 2.352-1.498 3.146 1.123.345 2.306.535 3.55.535 6.607 0 11.985-5.365 11.985-11.987C23.97 5.39 18.592.026 11.985.026L12.017 0z"/>
         </svg>
         Open on Pinterest →
@@ -564,66 +591,114 @@
     </div>
 
     <div class="px-5 pt-5">
-      <div class="text-[10px] uppercase font-bold tracking-[.15em] text-black/40 mb-1">Measurements</div>
-      <div id="modal-measurements" class="text-sm text-black/70">—</div>
+      <div class="field-label">Measurements</div>
+      <div id="modal-measurements" class="text-sm text-[color:var(--text-2)]">—</div>
     </div>
 
     <div class="px-5 pt-5">
-      <div class="text-[10px] uppercase font-bold tracking-[.15em] text-black/40 mb-2">Order Chat</div>
-      <div id="chat-log" class="surface-soft rounded-2xl p-4 h-80 overflow-y-auto space-y-3 text-sm scroll-y"></div>
+      <div class="field-label">Payment</div>
+      <div class="wa-card" style="padding: 16px;">
+        <div class="flex items-start gap-3 mb-3 relative">
+          <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+               style="background: linear-gradient(180deg, #25D366 0%, #128C7E 100%);">
+            <svg viewBox="0 0 24 24" fill="#fff" style="width:20px;height:20px">
+              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347"/>
+            </svg>
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="font-bold text-white text-sm" id="wa-tailor-line">Ask the tailor how best to pay</div>
+            <div class="text-xs mt-1" style="color: rgba(255,255,255,.7);" id="wa-tailor-sub">
+              They'll reply with bank details or USSD. You pay them directly.
+            </div>
+          </div>
+        </div>
+        <button id="btn-modal-wa" class="btn btn-whatsapp btn-sm w-full">
+          <svg viewBox="0 0 24 24" fill="currentColor" style="width:16px;height:16px">
+            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347"/>
+          </svg>
+          Open WhatsApp
+        </button>
+      </div>
+    </div>
+
+    <div class="px-5 pt-5">
+      <div class="field-label">Order Chat</div>
+      <div id="chat-log" class="surface-2 rounded-2xl p-4 h-72 overflow-y-auto space-y-3 scroll-y"></div>
     </div>
 
     <div class="px-5 pt-3 pb-2 flex flex-wrap gap-2">
-      <button id="btn-ask-pay" class="btn btn-gold btn-sm">
-        💬 Ask tailor best way to pay
-      </button>
-      <button id="btn-request-pay" class="btn btn-primary btn-sm hidden">
-        💳 Request Payment
-      </button>
-      <button id="btn-advance-ms" class="btn btn-ghost btn-sm hidden">
-        ▶ Advance Milestone
-      </button>
+      <button id="btn-ask-pay" class="btn btn-outline btn-sm">💬 Ask tailor best way to pay</button>
+      <button id="btn-advance-ms" class="btn btn-outline btn-sm hidden">▶ Advance Milestone</button>
     </div>
 
-    <div class="border-t border-black/5 p-4 flex gap-2 bg-white sticky bottom-0">
-      <input id="chat-input" placeholder="Type a message…" class="field !py-2.5 flex-1" />
-      <button id="btn-send-chat" class="btn btn-primary !px-5">Send</button>
+    <div class="p-4 flex gap-2 sticky bottom-0" style="background: var(--surface); border-top: 1px solid var(--line);">
+      <input id="chat-input" placeholder="Type a message…" class="field flex-1" style="padding: 10px 16px;" />
+      <button id="btn-send-chat" class="btn btn-gold" style="padding: 10px 22px;">Send</button>
     </div>
-
-    <!-- Tailor payment-request form -->
-    <div id="pay-request-form" class="hidden border-t border-black/5 p-5 bg-[#f3efe4] space-y-3">
-      <div class="text-xs font-bold uppercase tracking-wider text-black/60">Request Payment</div>
-      <div class="grid grid-cols-2 gap-2">
-        <input id="pr-amount" type="number" placeholder="Amount ₦" class="field !py-2.5" />
-        <select id="pr-method" class="field !py-2.5">
-          <option value="bank_transfer">Bank Transfer</option>
-          <option value="ussd">USSD</option>
-          <option value="cash">Cash</option>
-          <option value="installment">Installment Plan</option>
-        </select>
-      </div>
-      <div class="grid grid-cols-2 gap-2">
-        <select id="pr-bank" class="field !py-2.5">
-          <option value="">Select your bank…</option>
-        </select>
-        <input id="pr-account-number" placeholder="Account number" class="field !py-2.5 font-mono" maxlength="10" />
-      </div>
-      <input id="pr-account-name" placeholder="Account name" class="field !py-2.5" />
-      <input id="pr-notes" placeholder="Notes (split, deadline, etc.)" class="field !py-2.5" />
-      <div class="flex gap-2">
-        <button id="btn-send-pay-req" class="btn btn-gold flex-1 btn-sm">Send Request</button>
-        <button id="btn-cancel-pay-req" class="btn btn-ghost btn-sm">Cancel</button>
-      </div>
-    </div>
-
   </div>
 </div>
 
-<!-- CONFIG — paste your real values here -->
+<!-- ========== TAILOR WHATSAPP MODAL ========== -->
+<div id="modal-tailor-wa" class="hidden fixed inset-0 z-[60] p-4 overflow-y-auto"
+     style="background: rgba(0,0,0,.82); backdrop-filter: blur(8px);">
+  <div class="max-w-lg mx-auto surface p-6 my-8">
+    <div class="flex items-center gap-3 mb-2">
+      <div class="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
+           style="background: linear-gradient(180deg, #25D366 0%, #128C7E 100%);">
+        <svg viewBox="0 0 24 24" fill="#fff" style="width:22px;height:22px">
+          <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347"/>
+        </svg>
+      </div>
+      <div>
+        <h3 class="font-bold text-lg serif" style="color:#fff;">Your WhatsApp number</h3>
+        <p class="text-[11px] uppercase tracking-wider" style="color: rgba(255,255,255,.5);">Clients use this to pay you</p>
+      </div>
+      <button id="btn-close-tailor-wa" class="ml-auto text-[color:var(--text-3)] hover:text-white text-2xl leading-none">✕</button>
+    </div>
+
+    <p class="text-xs mt-2 mb-4" style="color: var(--text-2); line-height: 1.6;">
+      Every order you're assigned to will show clients a <b style="color: var(--green);">"Chat on WhatsApp"</b> button
+      that opens a chat with you, pre-filled with the order details. Set your country and state so we format the number correctly.
+    </p>
+
+    <div id="tailor-phone-picker" class="space-y-3">
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="field-label">Country</label>
+          <select class="field phone-country"></select>
+        </div>
+        <div>
+          <label class="field-label">State / Region</label>
+          <select class="field phone-state"></select>
+          <input class="field phone-state-text hidden" placeholder="State / Region">
+        </div>
+      </div>
+      <div>
+        <label class="field-label">WhatsApp / phone number</label>
+        <div class="phone-row">
+          <span class="dial-code">+234</span>
+          <input class="phone-number" placeholder="801 234 5678" inputmode="tel" autocomplete="tel" />
+        </div>
+        <p class="text-[11px] mt-2" style="color: var(--text-3);">
+          We'll save it as <span class="font-mono" id="tailor-number-preview">+234 ...</span>
+        </p>
+      </div>
+    </div>
+
+    <div class="flex gap-2 mt-5">
+      <button id="btn-cancel-tailor-wa" class="btn btn-outline flex-1">Cancel</button>
+      <button id="btn-save-tailor-wa" class="btn btn-gold flex-1">Save number</button>
+    </div>
+  </div>
+</div>
+
+<!-- CONFIG -->
 <script>
   window.STITCHLUXE_SUPABASE_URL      = 'PASTE_YOUR_SUPABASE_URL_HERE';
   window.STITCHLUXE_SUPABASE_ANON_KEY = 'PASTE_YOUR_SUPABASE_ANON_KEY_HERE';
+  window.STITCHLUXE_TAILOR_WHATSAPP   = '2348012345678';  /* house fallback number */
 </script>
-<script src="app.js?v=6"></script>
+<script src="app.js?v=8"></script>
+</div>
 </body>
 </html>
