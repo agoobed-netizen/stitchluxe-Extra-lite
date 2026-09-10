@@ -1,11 +1,11 @@
 /* =============================================================
-   StitchLuxe Extra Lite — app.js  (v2.3)
-   - Paystack removed
-   - Nigerian bank + fintech USSD/transfer payment flow
-   - Direct Pinterest buttons
+   StitchLuxe Extra Lite — app.js  (v2.5)
+   - Tailors self-serve their own WhatsApp number
+   - Full country + state + dial-code phone picker
+   - WhatsApp payment flow (no card)
+   - Direct Pinterest picker
    ============================================================= */
 
-/* ---------- GLOBAL ERROR BOUNDARY ---------- */
 window.addEventListener('error', e =>
   console.error('[GLOBAL ERROR]', e.message, '@', e.filename, ':', e.lineno));
 window.addEventListener('unhandledrejection', e =>
@@ -15,6 +15,7 @@ window.addEventListener('unhandledrejection', e =>
 const CONFIG = {
   SUPABASE_URL:      window.STITCHLUXE_SUPABASE_URL      || '',
   SUPABASE_ANON_KEY: window.STITCHLUXE_SUPABASE_ANON_KEY || '',
+  TAILOR_WHATSAPP:   window.STITCHLUXE_TAILOR_WHATSAPP   || '2348012345678',
   LS_KEY:     'stitchluxe_extra_lite_v1',
   LS_SESSION: 'stitchluxe_session_v1'
 };
@@ -28,33 +29,53 @@ const MILESTONES = [
   'Final Delivery'
 ];
 
-/* ---------- NIGERIAN BANKS (USSD patterns) ---------- */
-/* {amount} and {account} get substituted at runtime */
-const BANKS = [
-  // Commercial banks
-  { id:'gtb',        name:'GTBank',     ussd:'*737*1*{amount}*{account}#',     color:'#dd4b39', type:'commercial' },
-  { id:'firstbank',  name:'First Bank', ussd:'*894*{amount}*{account}#',       color:'#003d6b', type:'commercial' },
-  { id:'uba',        name:'UBA',        ussd:'*919*4*{amount}*{account}#',     color:'#c8102e', type:'commercial' },
-  { id:'zenith',     name:'Zenith',     ussd:'*966*{amount}*{account}#',       color:'#e4002b', type:'commercial' },
-  { id:'access',     name:'Access',     ussd:'*901*{amount}*{account}#',       color:'#f58220', type:'commercial' },
-  { id:'fidelity',   name:'Fidelity',   ussd:'*770*{amount}*{account}#',       color:'#005b8e', type:'commercial' },
-  { id:'union',      name:'Union Bank', ussd:'*826*{amount}*{account}#',       color:'#1b3b6f', type:'commercial' },
-  { id:'sterling',   name:'Sterling',   ussd:'*822*{amount}*{account}#',       color:'#e6003d', type:'commercial' },
-  { id:'wema',       name:'Wema / ALAT',ussd:'*945*{amount}*{account}#',       color:'#7b1a54', type:'commercial' },
-  { id:'stanbic',    name:'Stanbic IBTC',ussd:'*909*{amount}*{account}#',      color:'#0033a0', type:'commercial' },
-  // Fintechs
-  { id:'opay',       name:'Opay',       ussd:'*955*{amount}*{account}#',       color:'#1dc468', type:'fintech' },
-  { id:'palmpay',    name:'PalmPay',    ussd:'*861*{amount}*{account}#',       color:'#6b1f8a', type:'fintech' },
-  { id:'moniepoint', name:'Moniepoint', ussd:'*5573*{amount}*{account}#',      color:'#2e3a8a', type:'fintech' },
-  { id:'kuda',       name:'Kuda',       ussd:null,                              color:'#40196d', type:'fintech',
-    note:'Open Kuda app → Transfer → Send to bank → paste account' },
+/* ---------- COUNTRIES + STATES ---------- */
+const COUNTRIES = [
+  { iso:'NG', name:'Nigeria', flag:'🇳🇬', dial:'+234', states:['Abia','Adamawa','Akwa Ibom','Anambra','Bauchi','Bayelsa','Benue','Borno','Cross River','Delta','Ebonyi','Edo','Ekiti','Enugu','FCT - Abuja','Gombe','Imo','Jigawa','Kaduna','Kano','Katsina','Kebbi','Kogi','Kwara','Lagos','Nasarawa','Niger','Ogun','Ondo','Osun','Oyo','Plateau','Rivers','Sokoto','Taraba','Yobe','Zamfara'] },
+  { iso:'GH', name:'Ghana', flag:'🇬🇭', dial:'+233', states:['Greater Accra','Ashanti','Western','Western North','Eastern','Central','Volta','Oti','Northern','Savannah','North East','Upper East','Upper West','Bono','Bono East','Ahafo'] },
+  { iso:'KE', name:'Kenya', flag:'🇰🇪', dial:'+254', states:['Nairobi','Mombasa','Kisumu','Nakuru','Kiambu','Machakos','Kajiado','Uasin Gishu','Meru','Nyeri','Kakamega','Kisii','Bungoma','Kilifi','Taita-Taveta','Garissa','Turkana'] },
+  { iso:'ZA', name:'South Africa', flag:'🇿🇦', dial:'+27', states:['Gauteng','Western Cape','KwaZulu-Natal','Eastern Cape','Free State','Limpopo','Mpumalanga','North West','Northern Cape'] },
+  { iso:'EG', name:'Egypt', flag:'🇪🇬', dial:'+20', states:['Cairo','Giza','Alexandria','Dakahlia','Sharqia','Qalyubia','Gharbia','Monufia','Beheira','Port Said','Suez','Ismailia','Damietta','Kafr El Sheikh','Fayoum','Beni Suef','Minya','Asyut','Sohag','Qena','Luxor','Aswan','Red Sea','New Valley','Matrouh','North Sinai','South Sinai'] },
+  { iso:'TZ', name:'Tanzania', flag:'🇹🇿', dial:'+255', states:['Dar es Salaam','Arusha','Mwanza','Dodoma','Mbeya','Morogoro','Tanga','Kilimanjaro','Zanzibar'] },
+  { iso:'UG', name:'Uganda', flag:'🇺🇬', dial:'+256', states:['Kampala','Wakiso','Mukono','Jinja','Gulu','Mbarara','Mbale','Masaka','Entebbe','Fort Portal'] },
+  { iso:'CI', name:"Côte d'Ivoire", flag:'🇨🇮', dial:'+225', states:['Abidjan','Yamoussoukro','Bouaké','Daloa','San-Pédro','Korhogo'] },
+  { iso:'SN', name:'Senegal', flag:'🇸🇳', dial:'+221', states:['Dakar','Thiès','Saint-Louis','Diourbel','Kaolack','Ziguinchor','Touba'] },
+  { iso:'CM', name:'Cameroon', flag:'🇨🇲', dial:'+237', states:['Centre','Littoral','West','North West','South West','South','East','Adamawa','North','Far North'] },
+  { iso:'US', name:'United States', flag:'🇺🇸', dial:'+1', states:['Alabama','Alaska','Arizona','Arkansas','California','Colorado','Connecticut','Delaware','Florida','Georgia','Hawaii','Idaho','Illinois','Indiana','Iowa','Kansas','Kentucky','Louisiana','Maine','Maryland','Massachusetts','Michigan','Minnesota','Mississippi','Missouri','Montana','Nebraska','Nevada','New Hampshire','New Jersey','New Mexico','New York','North Carolina','North Dakota','Ohio','Oklahoma','Oregon','Pennsylvania','Rhode Island','South Carolina','South Dakota','Tennessee','Texas','Utah','Vermont','Virginia','Washington','West Virginia','Wisconsin','Wyoming'] },
+  { iso:'CA', name:'Canada', flag:'🇨🇦', dial:'+1', states:['Ontario','Quebec','British Columbia','Alberta','Manitoba','Saskatchewan','Nova Scotia','New Brunswick','Newfoundland and Labrador','Prince Edward Island','Northwest Territories','Yukon','Nunavut'] },
+  { iso:'GB', name:'United Kingdom', flag:'🇬🇧', dial:'+44', states:['England','Scotland','Wales','Northern Ireland'] },
+  { iso:'AE', name:'United Arab Emirates', flag:'🇦🇪', dial:'+971', states:['Abu Dhabi','Dubai','Sharjah','Ajman','Umm Al Quwain','Ras Al Khaimah','Fujairah'] },
+  { iso:'DE', name:'Germany', flag:'🇩🇪', dial:'+49', states:['Bavaria','Berlin','Hamburg','Hesse','North Rhine-Westphalia','Baden-Württemberg','Lower Saxony','Saxony','Rhineland-Palatinate'] },
+  { iso:'FR', name:'France', flag:'🇫🇷', dial:'+33', states:['Île-de-France','Provence-Alpes-Côte d’Azur','Auvergne-Rhône-Alpes','Nouvelle-Aquitaine','Occitanie','Hauts-de-France','Grand Est','Pays de la Loire','Normandy','Brittany'] },
+  { iso:'IT', name:'Italy', flag:'🇮🇹', dial:'+39', states:['Lombardy','Lazio','Campania','Sicily','Veneto','Piedmont','Emilia-Romagna','Tuscany','Puglia'] },
+  { iso:'ES', name:'Spain', flag:'🇪🇸', dial:'+34', states:['Madrid','Catalonia','Andalusia','Valencia','Galicia','Basque Country','Canary Islands'] },
+  { iso:'NL', name:'Netherlands', flag:'🇳🇱', dial:'+31', states:['North Holland','South Holland','Utrecht','North Brabant','Gelderland','Limburg'] },
+  { iso:'BE', name:'Belgium', flag:'🇧🇪', dial:'+32', states:['Brussels','Flanders','Wallonia'] },
+  { iso:'PT', name:'Portugal', flag:'🇵🇹', dial:'+351', states:['Lisbon','Porto','Braga','Coimbra','Faro','Madeira','Azores'] },
+  { iso:'BR', name:'Brazil', flag:'🇧🇷', dial:'+55', states:['São Paulo','Rio de Janeiro','Minas Gerais','Bahia','Paraná','Rio Grande do Sul','Pernambuco','Ceará','Distrito Federal'] },
+  { iso:'IN', name:'India', flag:'🇮🇳', dial:'+91', states:['Maharashtra','Delhi','Karnataka','Tamil Nadu','Uttar Pradesh','Gujarat','West Bengal','Rajasthan','Kerala','Telangana','Punjab','Haryana'] },
+  { iso:'CN', name:'China', flag:'🇨🇳', dial:'+86', states:['Beijing','Shanghai','Guangdong','Zhejiang','Jiangsu','Sichuan','Fujian','Shandong','Hubei'] },
+  { iso:'JP', name:'Japan', flag:'🇯🇵', dial:'+81', states:['Tokyo','Osaka','Kyoto','Aichi','Kanagawa','Fukuoka','Hokkaido','Hyogo'] },
+  { iso:'OT', name:'Other country', flag:'🌍', dial:'+', states:null }
 ];
+
+const PINTEREST_QUERIES = {
+  'Agbada':          'agbada design men',
+  'Ankara Gown':     'ankara gown styles',
+  'Kaftan':          'kaftan styles women',
+  'Bridal / Aso Ebi':'aso ebi bridal styles',
+  'Suit (2-piece)':  'bespoke suit design',
+  'Senator Set':     'senator kaftan men',
+  'Other':           'african fashion design'
+};
 
 /* ---------- STATE ---------- */
 const state = {
   user: null,
   orders: [], listings: [], applications: [], payments: [],
-  messages: {}, activeOrderId: null, activeTab: 'orders'
+  messages: {}, activeOrderId: null, activeTab: 'orders',
+  profile: null,
+  pickers: {}          // named phone-picker instances
 };
 
 /* ---------- UTIL ---------- */
@@ -69,57 +90,34 @@ const initials = (name='') => {
   return (parts[0][0] + (parts[1]?.[0] || '')).toUpperCase();
 };
 const fmtDate = (ts) => new Date(ts).toLocaleDateString('en-NG', { month:'short', day:'numeric', year:'numeric' });
+const cleanPhone = (p='') => String(p).replace(/\D/g, '');
 
 function toast(msg, type='info') {
-  const wrap = $('toast-wrap');
-  if (!wrap) return;
-  const colors = {
-    info:'bg-black text-white', success:'bg-green-600 text-white',
-    error:'bg-red-600 text-white', warn:'bg-[#c9a227] text-black'
+  const wrap = $('toast-wrap'); if (!wrap) return;
+  const styles = {
+    info:    'background: var(--surface-2); color: var(--text); border: 1px solid var(--gold-line);',
+    success: 'background: var(--green-dim); color: var(--green); border: 1px solid rgba(74,222,128,.4);',
+    error:   'background: var(--red-dim); color: var(--red); border: 1px solid rgba(248,113,113,.4);',
+    warn:    'background: var(--gold-dim); color: var(--gold-hi); border: 1px solid var(--gold-line);'
   };
   const el = document.createElement('div');
-  el.className = `toast ${colors[type]} text-sm font-medium px-4 py-3 rounded-xl shadow-lg`;
+  el.className = 'toast text-sm font-semibold px-4 py-3 rounded-xl shadow-lg';
+  el.setAttribute('style', styles[type]);
   el.textContent = msg;
   wrap.appendChild(el);
   setTimeout(() => el.remove(), 3500);
 }
 
-function copyText(text, btn) {
-  const done = () => {
-    if (btn) {
-      const orig = btn.textContent;
-      btn.textContent = '✓ Copied';
-      btn.classList.add('copy-ok');
-      setTimeout(() => { btn.textContent = orig; btn.classList.remove('copy-ok'); }, 1500);
-    }
-    toast('Copied to clipboard', 'success');
-  };
-  if (navigator.clipboard?.writeText) {
-    navigator.clipboard.writeText(text).then(done).catch(() => fallback());
-  } else fallback();
-
-  function fallback() {
-    const ta = document.createElement('textarea');
-    ta.value = text; document.body.appendChild(ta); ta.select();
-    try { document.execCommand('copy'); done(); } catch { toast('Copy failed', 'error'); }
-    ta.remove();
-  }
-}
-
-/* ---------- SAFE LOCALSTORAGE ---------- */
-function lsRead(key, fallback) {
-  try { return JSON.parse(localStorage.getItem(key)) ?? fallback; }
-  catch { return fallback; }
-}
+/* ---------- SAFE STORAGE ---------- */
+function lsRead(key, fb) { try { return JSON.parse(localStorage.getItem(key)) ?? fb; } catch { return fb; } }
 function lsWrite(key, val) {
   try { localStorage.setItem(key, JSON.stringify(val)); return true; }
   catch (e) { console.warn('[StitchLuxe] lsWrite failed:', e.name); return false; }
 }
 
-/* ---------- SUPABASE CLIENT ---------- */
+/* ---------- SUPABASE ---------- */
 let sb = null;
 let useLocal = true;
-
 function supabaseReady() {
   return !useLocal && sb && sb.auth
     && typeof sb.auth.signUp === 'function'
@@ -137,21 +135,17 @@ function isStructuralError(e) {
       || msg.includes('Failed to fetch')
       || msg.includes('NetworkError');
 }
-
 if (CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY && window.supabase) {
   try {
     sb = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
     if (sb?.auth && typeof sb.auth.signUp === 'function' && typeof sb.auth.signInWithPassword === 'function') {
       useLocal = false;
-      console.log('[StitchLuxe] Supabase client OK — connected to real backend');
+      console.log('[StitchLuxe] Supabase client OK');
     } else {
-      console.warn('[StitchLuxe] Supabase client missing .auth — LOCAL mode');
+      console.warn('[StitchLuxe] Supabase client invalid — LOCAL mode');
       sb = null; useLocal = true;
     }
-  } catch (e) {
-    console.warn('[StitchLuxe] Supabase init threw:', e);
-    sb = null; useLocal = true;
-  }
+  } catch (e) { console.warn('[StitchLuxe] Supabase init threw:', e); sb = null; useLocal = true; }
 }
 
 /* ---------- LOCAL SEED ---------- */
@@ -161,19 +155,19 @@ function seedLocal() {
   const seed = { orders: [], listings: [], applications: [], payments: [], messages: {}, profiles: {} };
   seed.profiles['mastertailor@stitchluxe.com'] = {
     id: 'tailor-demo-001', email: 'mastertailor@stitchluxe.com',
-    full_name: 'Master Ade Tailor', role: 'tailor'
+    full_name: 'Master Ade Tailor', role: 'tailor',
+    whatsapp: '2348012345678', country: 'NG', state: 'Lagos'
   };
   seed.profiles['designer@stitchluxe.com'] = {
     id: 'client-demo-001', email: 'designer@stitchluxe.com',
-    full_name: 'Ada Designer', role: 'client'
+    full_name: 'Ada Designer', role: 'client',
+    whatsapp: '2348098765432', country: 'NG', state: 'Lagos'
   };
   lsWrite(CONFIG.LS_KEY, seed);
   return seed;
 }
 
-/* =============================================================
-   DB ADAPTER
-   ============================================================= */
+/* ---------- DB ADAPTER ---------- */
 const db = {
   async signIn(email, password, role) {
     if (supabaseReady()) {
@@ -186,17 +180,13 @@ const db = {
           profile = p;
         } catch {}
         return { user: data.user, profile: profile || { id: data.user.id, email, full_name: email, role } };
-      } catch (e) {
-        if (isStructuralError(e)) forceLocalMode('signIn: ' + e.message);
-        else throw e;
-      }
+      } catch (e) { if (isStructuralError(e)) forceLocalMode('signIn'); else throw e; }
     }
     const store = seedLocal();
     let profile = store.profiles[email];
     if (!profile) {
       profile = { id: uid(), email, full_name: email.split('@')[0], role: role || 'client' };
-      store.profiles[email] = profile;
-      lsWrite(CONFIG.LS_KEY, store);
+      store.profiles[email] = profile; lsWrite(CONFIG.LS_KEY, store);
     }
     return { user: { id: profile.id, email }, profile };
   },
@@ -208,21 +198,51 @@ const db = {
         });
         if (error) throw error;
         return { user: data.user, profile: { id: data.user?.id, email, full_name: fullName, role } };
-      } catch (e) {
-        if (isStructuralError(e)) forceLocalMode('signUp');
-        else throw e;
-      }
+      } catch (e) { if (isStructuralError(e)) forceLocalMode('signUp'); else throw e; }
     }
     const store = seedLocal();
     const profile = { id: uid(), email, full_name: fullName, role: role || 'client' };
-    store.profiles[email] = profile;
-    lsWrite(CONFIG.LS_KEY, store);
+    store.profiles[email] = profile; lsWrite(CONFIG.LS_KEY, store);
     return { user: { id: profile.id, email }, profile };
   },
   async signOut() {
     if (supabaseReady()) try { await sb.auth.signOut(); } catch {}
     try { localStorage.removeItem(CONFIG.LS_SESSION); } catch {}
   },
+
+  /* ---------- PROFILES ---------- */
+  async getProfile(id) {
+    if (!id) return null;
+    if (supabaseReady()) {
+      try {
+        const { data, error } = await sb.from('profiles').select('*').eq('id', id).single();
+        if (error) throw error;
+        return data;
+      } catch (e) { if (isStructuralError(e)) forceLocalMode('getProfile'); else throw e; }
+    }
+    const store = seedLocal();
+    const entry = Object.values(store.profiles || {}).find(p => p.id === id);
+    return entry || null;
+  },
+  async updateProfile(id, patch) {
+    if (!id) return null;
+    if (supabaseReady()) {
+      try {
+        const { data, error } = await sb.from('profiles').update(patch).eq('id', id).select().single();
+        if (error) throw error;
+        return data;
+      } catch (e) { if (isStructuralError(e)) forceLocalMode('updateProfile'); else throw e; }
+    }
+    const store = seedLocal();
+    const key = Object.keys(store.profiles || {}).find(k => store.profiles[k].id === id);
+    if (key) {
+      store.profiles[key] = { ...store.profiles[key], ...patch };
+      lsWrite(CONFIG.LS_KEY, store);
+      return store.profiles[key];
+    }
+    return null;
+  },
+
   async listOrders() {
     if (supabaseReady()) {
       try {
@@ -366,6 +386,237 @@ const db = {
 };
 
 /* =============================================================
+   PHONE PICKER COMPONENT
+   Wraps a DOM container with .phone-country, .phone-state,
+   .phone-state-text, .dial-code, .phone-number
+   ============================================================= */
+function createPhonePicker(container, opts = {}) {
+  if (!container) return null;
+  const countrySel = container.querySelector('.phone-country');
+  const stateSel   = container.querySelector('.phone-state');
+  const stateText  = container.querySelector('.phone-state-text');
+  const dialEl     = container.querySelector('.dial-code');
+  const numberEl   = container.querySelector('.phone-number');
+  if (!countrySel || !stateSel || !stateText || !dialEl || !numberEl) return null;
+
+  // Populate countries
+  countrySel.innerHTML = COUNTRIES.map(c =>
+    `<option value="${c.iso}">${c.flag}  ${c.name}  ${c.dial}</option>`).join('');
+  countrySel.value = opts.defaultCountry || 'NG';
+
+  function refreshStates() {
+    const country = COUNTRIES.find(c => c.iso === countrySel.value);
+    if (!country) return;
+    dialEl.textContent = country.dial;
+    if (Array.isArray(country.states) && country.states.length) {
+      stateSel.classList.remove('hidden');
+      stateText.classList.add('hidden');
+      const prev = stateSel.value;
+      stateSel.innerHTML = '<option value="">Select state / region…</option>' +
+        country.states.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
+      if (prev) stateSel.value = prev;
+    } else {
+      stateSel.classList.add('hidden');
+      stateText.classList.remove('hidden');
+    }
+    updatePreview();
+  }
+
+  function updatePreview() {
+    if (opts.onChange) opts.onChange(api.getValue());
+  }
+
+  countrySel.addEventListener('change', refreshStates);
+  stateSel.addEventListener('change', updatePreview);
+  stateText.addEventListener('input', updatePreview);
+  numberEl.addEventListener('input', updatePreview);
+
+  refreshStates();
+
+  const api = {
+    getValue() {
+      const country = COUNTRIES.find(c => c.iso === countrySel.value);
+      const stateVal = (Array.isArray(country?.states) && country.states.length
+        ? stateSel.value
+        : stateText.value).trim();
+      const raw = cleanPhone(numberEl.value);
+      const localRaw = raw.replace(/^0+/, '');       // strip leading zeros
+      const whatsapp = (raw && country?.dial)
+        ? country.dial.replace('+', '') + localRaw
+        : '';
+      return {
+        country_iso:  country?.iso || '',
+        country_name: country?.name || '',
+        country_dial: country?.dial || '',
+        state:        stateVal,
+        phone_raw:    raw,
+        whatsapp
+      };
+    },
+    setValue(v = {}) {
+      if (v.country_iso) countrySel.value = v.country_iso;
+      refreshStates();
+      if (v.state) {
+        const country = COUNTRIES.find(c => c.iso === countrySel.value);
+        if (Array.isArray(country?.states) && country.states.length) stateSel.value = v.state;
+        else stateText.value = v.state;
+      }
+      if (v.phone_raw) numberEl.value = v.phone_raw;
+      updatePreview();
+    },
+    clear() {
+      stateSel.value = '';
+      stateText.value = '';
+      numberEl.value = '';
+      updatePreview();
+    },
+    isValid() {
+      const v = api.getValue();
+      return !!(v.country_iso && v.whatsapp && v.phone_raw.length >= 6);
+    }
+  };
+  return api;
+}
+
+/* =============================================================
+   WHATSAPP HELPERS
+   ============================================================= */
+function buildWhatsAppLink(phone, message) {
+  const clean = cleanPhone(phone);
+  const text = encodeURIComponent(message);
+  return `https://wa.me/${clean}?text=${text}`;
+}
+
+async function resolveTailorWhatsApp(order) {
+  // 1) Try order's assigned tailor profile
+  if (order?.tailor_id) {
+    try {
+      const p = await db.getProfile(order.tailor_id);
+      if (p?.whatsapp) return { number: p.whatsapp, name: p.full_name, isHouse: false };
+    } catch (e) { console.warn('[StitchLuxe] resolve tailor failed', e); }
+  }
+  // 2) Fall back to house number
+  return { number: CONFIG.TAILOR_WHATSAPP, name: 'StitchLuxe Atelier', isHouse: true };
+}
+
+function openWhatsAppTo(number, message) {
+  window.open(buildWhatsAppLink(number, message), '_blank', 'noopener');
+}
+
+async function openWhatsAppForOrder(order) {
+  const { number, name, isHouse } = await resolveTailorWhatsApp(order);
+  const garment = order?.garment_type || 'my order';
+  const budget  = order?.budget ? ` (budget ${money(order.budget)})` : '';
+  const intro = isHouse
+    ? `Hello StitchLuxe! I'm ${state.user?.full_name || 'a client'} on StitchLuxe.`
+    : `Hello ${name || 'there'}! I'm ${state.user?.full_name || 'a client'} on StitchLuxe.`;
+  const msg =
+    `${intro}\n\n` +
+    `I'd like to pay for my ${garment} order${budget}.\n` +
+    `What's the best way for me to send it?\n` +
+    `(bank transfer, USSD, or cash on delivery — whichever works best for you.)\n\n` +
+    `Order ID: ${order?.id || 'n/a'}`;
+  openWhatsAppTo(number, msg);
+}
+
+async function openWhatsAppGeneric() {
+  const order = state.orders[0];
+  if (order) return openWhatsAppForOrder(order);
+  const msg = `Hello StitchLuxe! I'm ${state.user?.full_name || 'a client'}.\n\n` +
+              `I'd like to discuss payment for my order. What's the best way to send it?`;
+  openWhatsAppTo(CONFIG.TAILOR_WHATSAPP, msg);
+}
+
+/* =============================================================
+   PINTEREST
+   ============================================================= */
+function pinterestSearchUrl(garment) {
+  const q = PINTEREST_QUERIES[garment] || 'african fashion design';
+  return `https://www.pinterest.com/search/pins/?q=${encodeURIComponent(q)}`;
+}
+
+function updatePinterestPicker() {
+  const sel = $('order-garment');
+  const wrap = $('pinterest-picker');
+  const link = $('pin-browse-btn');
+  const label = $('pin-browse-label');
+  const nameEl = $('pin-garment-name');
+  if (!sel || !wrap || !link) return;
+
+  const garment = sel.value;
+  if (!garment) { wrap.classList.add('hidden'); return; }
+
+  link.href = pinterestSearchUrl(garment);
+  const labelText = PINTEREST_QUERIES[garment] || 'styles';
+  if (label) label.textContent = labelText;
+  if (nameEl) nameEl.textContent = garment.toLowerCase();
+  wrap.classList.remove('hidden');
+}
+
+/* =============================================================
+   TAILOR WHATSAPP SETUP
+   ============================================================= */
+function updateTailorSetupBanner() {
+  const banner = $('tailor-setup-banner');
+  const btnMyWa = $('btn-my-wa');
+  if (!banner || !btnMyWa) return;
+  const isTailor = state.user?.role === 'tailor';
+  btnMyWa.classList.toggle('hidden', !isTailor);
+  if (!isTailor) { banner.classList.add('hidden'); return; }
+  const hasNumber = !!(state.profile?.whatsapp);
+  banner.classList.toggle('hidden', hasNumber);
+}
+
+function openTailorWaModal(opts = {}) {
+  const modal = $('modal-tailor-wa'); if (!modal) return;
+  modal.classList.remove('hidden');
+  const picker = state.pickers.tailor;
+  if (picker) {
+    picker.setValue({
+      country_iso: state.profile?.country || 'NG',
+      state:       state.profile?.state || '',
+      phone_raw:   state.profile?.phone_raw || (state.profile?.whatsapp ? state.profile.whatsapp.replace(/^\d{1,3}/, '') : '')
+    });
+  }
+  // lock close on first-time prompt?
+  const closeBtn = $('btn-close-tailor-wa');
+  const cancelBtn = $('btn-cancel-tailor-wa');
+  const lock = !!opts.lock;
+  if (closeBtn) closeBtn.classList.toggle('hidden', lock);
+  if (cancelBtn) cancelBtn.classList.toggle('hidden', lock);
+}
+
+function closeTailorWaModal() {
+  $('modal-tailor-wa')?.classList.add('hidden');
+}
+
+async function saveTailorWa() {
+  const picker = state.pickers.tailor; if (!picker) return;
+  const v = picker.getValue();
+  if (!v.country_iso) return toast('Please pick your country.', 'error');
+  if (!v.phone_raw || v.phone_raw.length < 6) return toast('Please enter your phone number.', 'error');
+  if (!v.state) return toast('Please select your state / region.', 'error');
+
+  const patch = {
+    whatsapp:  v.whatsapp,
+    country:   v.country_iso,
+    state:     v.state,
+    phone_raw: v.phone_raw
+  };
+
+  try {
+    const updated = await db.updateProfile(state.user.id, patch);
+    state.profile = { ...(state.profile || {}), ...(updated || patch) };
+    updateTailorSetupBanner();
+    closeTailorWaModal();
+    toast('WhatsApp number saved. Clients can now reach you.', 'success');
+  } catch (e) {
+    console.error('[StitchLuxe] save tailor WA failed', e);
+    toast('Could not save — try again.', 'error');
+  }
+}
+
+/* =============================================================
    AUTH
    ============================================================= */
 function showAuthError(msg) {
@@ -380,7 +631,7 @@ async function handleLogin(e) {
   const email = ($('auth-email')?.value || '').trim();
   const password = $('auth-password')?.value || '';
   const role = $('auth-role')?.value || 'client';
-  console.log('[StitchLuxe] login attempt', { email, role, mode: useLocal ? 'LOCAL' : 'SUPABASE' });
+  console.log('[StitchLuxe] login', { email, mode: useLocal ? 'LOCAL' : 'SUPABASE' });
   if (!email) return showAuthError('Please enter your email.');
   if (password.length < 6) return showAuthError('Password must be at least 6 characters.');
   try {
@@ -389,7 +640,7 @@ async function handleLogin(e) {
       id: user.id, email,
       full_name: profile?.full_name || email.split('@')[0],
       role: profile?.role || role
-    });
+    }, profile);
   } catch (err) {
     console.error('[StitchLuxe] sign-in failed', err);
     showAuthError(err?.message || 'Sign-in failed. Check your credentials.');
@@ -407,8 +658,15 @@ async function handleSignup() {
   if (password.length < 6) return showAuthError('Password must be at least 6 characters.');
   try {
     const { user, profile } = await db.signUp(email, password, name, role);
-    startSession({ id: user.id || 'local-' + Date.now(), email, full_name: name, role: profile?.role || role });
+    startSession(
+      { id: user.id || 'local-' + Date.now(), email, full_name: name, role: profile?.role || role },
+      profile
+    );
     toast('Welcome to StitchLuxe!', 'success');
+    // Prompt tailors to set their WhatsApp right away
+    if ((profile?.role || role) === 'tailor') {
+      setTimeout(() => openTailorWaModal({ lock: false }), 500);
+    }
   } catch (err) {
     console.error('[StitchLuxe] signup failed', err);
     showAuthError(err?.message || 'Signup failed. Try a different email.');
@@ -422,10 +680,10 @@ function handleDemo() {
   handleLogin();
 }
 
-function startSession(user) {
+function startSession(user, profile) {
   state.user = user;
-  const gate = $('auth-gate');
-  const shell = $('app-shell');
+  state.profile = profile || { id: user.id, email: user.email, full_name: user.full_name, role: user.role };
+  const gate = $('auth-gate'), shell = $('app-shell');
   if (gate) gate.classList.add('hidden');
   if (shell) {
     shell.classList.remove('hidden');
@@ -436,12 +694,30 @@ function startSession(user) {
   if ($('user-name-display')) $('user-name-display').textContent = user.full_name || user.email;
   if ($('user-role-display')) $('user-role-display').textContent = user.role;
   if ($('user-avatar'))       $('user-avatar').textContent = initials(user.full_name || user.email);
+
+  // Prefill client phone picker from profile if available
+  if (state.pickers.client && state.profile) {
+    state.pickers.client.setValue({
+      country_iso: state.profile.country || 'NG',
+      state:       state.profile.state || '',
+      phone_raw:   state.profile.phone_raw || ''
+    });
+  }
+
+  updateTailorSetupBanner();
+
+  // Tailor who is missing their number → open prompt quietly after a beat
+  if (user.role === 'tailor' && !state.profile?.whatsapp) {
+    setTimeout(() => openTailorWaModal({ lock: false }), 700);
+  }
+
   refreshAll().catch(err => console.warn('[StitchLuxe] refreshAll error:', err));
 }
 
 async function handleLogout() {
   try { await db.signOut(); } catch {}
   state.user = null;
+  state.profile = null;
   const shell = $('app-shell'), gate = $('auth-gate');
   if (shell) { shell.classList.add('hidden'); shell.style.display = 'none'; }
   if (gate)  { gate.classList.remove('hidden'); gate.style.display = 'flex'; }
@@ -473,7 +749,7 @@ function renderOrders() {
     (String(o.garment_type||'') + ' ' + String(o.description||'')).toLowerCase().includes(q));
   root.innerHTML = '';
   if (!rows.length) {
-    root.innerHTML = `<li class="empty-state">No orders yet.<br/>Create your first bespoke order →</li>`;
+    root.innerHTML = `<li class="empty-state">No orders yet.<br/><span style="color:var(--gold)">Create your first bespoke order →</span></li>`;
     return;
   }
   rows.forEach(o => {
@@ -487,16 +763,18 @@ function renderOrders() {
       <div class="flex items-start justify-between gap-3">
         <div class="min-w-0">
           <div class="font-bold text-sm truncate">${escapeHtml(o.garment_type || 'Garment')}</div>
-          <div class="text-xs text-black/50 truncate mt-0.5">${escapeHtml((o.description||'').slice(0,60) || 'No description')}</div>
+          <div class="text-xs truncate mt-0.5" style="color:var(--text-3)">${escapeHtml((o.description||'').slice(0,60) || 'No description')}</div>
         </div>
         <span class="badge ${statusClass}">${escapeHtml(o.status || 'pending')}</span>
       </div>
-      <div class="mt-3 h-1.5 bg-black/5 rounded-full overflow-hidden">
-        <div class="h-full bg-[#c9a227] transition-all" style="width:${pct}%"></div>
+      <div class="mt-3 h-1.5 rounded-full overflow-hidden" style="background: rgba(242,237,225,.05);">
+        <div class="h-full transition-all" style="width:${pct}%; background: linear-gradient(90deg, var(--gold) 0%, #b8922a 100%);"></div>
       </div>
-      <div class="flex justify-between text-[10px] text-black/40 mt-1.5 font-medium">
-        <span>Milestone ${o.milestone || 1} of ${total}</span>
-        <span class="text-black/70 font-semibold">${money(o.budget)}</span>
+      <div class="flex justify-between text-[10px] mt-2 font-medium">
+        <span style="color:var(--text-3); letter-spacing:.05em; text-transform:uppercase;">
+          Milestone ${o.milestone || 1} / ${total}
+        </span>
+        <span style="color:var(--gold); font-weight:700;">${money(o.budget)}</span>
       </div>
     `;
     root.appendChild(li);
@@ -527,14 +805,9 @@ async function openOrder(orderId) {
     `Created ${fmtDate(o.created_at)} · Budget ${money(o.budget)}`;
   renderMilestoneBar(o);
 
-  // Pinterest direct button
   if (o.pinterest_url) {
     const pin = $('modal-pinterest');
-    if (pin) {
-      pin.href = o.pinterest_url;
-      pin.setAttribute('rel', 'noopener noreferrer');
-      pin.setAttribute('target', '_blank');
-    }
+    if (pin) { pin.href = o.pinterest_url; }
     $('modal-pinterest-wrap')?.classList.remove('hidden');
   } else {
     $('modal-pinterest-wrap')?.classList.add('hidden');
@@ -545,30 +818,27 @@ async function openOrder(orderId) {
   if ($('modal-measurements')) $('modal-measurements').textContent = mtxt;
 
   const isTailor = state.user?.role === 'tailor';
-  $('btn-request-pay')?.classList.toggle('hidden', !isTailor);
   $('btn-advance-ms')?.classList.toggle('hidden', !isTailor);
-  $('pay-request-form')?.classList.add('hidden');
 
-  populateBankSelect();
+  // Resolve tailor name for the WhatsApp CTA copy
+  const resolved = await resolveTailorWhatsApp(o);
+  const lineEl = $('wa-tailor-line');
+  const subEl  = $('wa-tailor-sub');
+  if (lineEl) lineEl.textContent = resolved.isHouse
+    ? 'Ask the StitchLuxe atelier how best to pay'
+    : `Ask ${resolved.name || 'your tailor'} how best to pay`;
+  if (subEl) subEl.textContent = resolved.isHouse
+    ? "We'll connect you to the atelier on WhatsApp — they'll reply with bank details or USSD."
+    : "We'll open a WhatsApp chat with your tailor — they'll reply with bank details or USSD.";
+
+  const waBtn = $('btn-modal-wa');
+  if (waBtn) waBtn.onclick = () => openWhatsAppForOrder(o);
+
   await loadChat(orderId);
 }
 
-/* Populate tailor-side bank dropdown once */
-function populateBankSelect() {
-  const sel = $('pr-bank'); if (!sel || sel.dataset.filled === '1') return;
-  sel.innerHTML = '<option value="">Select your bank…</option>';
-  const commercial = BANKS.filter(b => b.type === 'commercial');
-  const fintech = BANKS.filter(b => b.type === 'fintech');
-  const optg1 = document.createElement('optgroup'); optg1.label = 'Commercial Banks';
-  commercial.forEach(b => optg1.appendChild(new Option(b.name, b.id)));
-  const optg2 = document.createElement('optgroup'); optg2.label = 'Fintech / Neobanks';
-  fintech.forEach(b => optg2.appendChild(new Option(b.name, b.id)));
-  sel.appendChild(optg1); sel.appendChild(optg2);
-  sel.dataset.filled = '1';
-}
-
 /* =============================================================
-   CHAT + PAYMENT RENDERING
+   CHAT
    ============================================================= */
 async function loadChat(orderId) {
   state.messages[orderId] = await db.listMessages(orderId);
@@ -580,199 +850,34 @@ function renderChat() {
   const msgs = state.messages[state.activeOrderId] || [];
   log.innerHTML = '';
   if (!msgs.length) {
-    log.innerHTML = `<div class="text-xs text-black/40 italic text-center py-6">No messages yet. Start the conversation.</div>`;
+    log.innerHTML = `<div class="text-xs italic text-center py-6" style="color:var(--text-3)">No messages yet — say hello 👋</div>`;
     return;
   }
   msgs.forEach(m => {
     const isMe = m.sender_id === state.user.id;
     const wrap = document.createElement('div');
     wrap.className = `flex ${isMe ? 'justify-end' : 'justify-start'}`;
-
-    if (m.message_type === 'payment_request') {
-      wrap.classList.add('!justify-start');
-      wrap.appendChild(buildPaymentCard(m, isMe));
-    } else if (m.message_type === 'ask_payment') {
-      wrap.innerHTML = `<div class="bubble-them bg-blue-50 border-blue-200">
-        <div class="font-bold text-xs uppercase tracking-wide text-blue-600 mb-1">💬 Payment Question</div>
+    if (m.message_type === 'ask_payment') {
+      wrap.innerHTML = `<div class="bubble-them" style="background: rgba(59,130,246,.1); border-color: rgba(59,130,246,.3);">
+        <div class="font-bold text-xs uppercase tracking-wider mb-1" style="color:#60a5fa;">💬 Payment Question</div>
         <div>${escapeHtml(m.message)}</div>
       </div>`;
     } else if (m.message_type === 'payment_confirmed') {
-      wrap.innerHTML = `<div class="bubble-them bg-green-50 border-green-200">
-        <div class="font-bold text-xs uppercase tracking-wide text-green-700 mb-1">✓ Payment Confirmed</div>
+      wrap.innerHTML = `<div class="bubble-them" style="background: var(--green-dim); border-color: rgba(74,222,128,.3);">
+        <div class="font-bold text-xs uppercase tracking-wider mb-1" style="color:var(--green);">✓ Payment Confirmed</div>
         <div>${escapeHtml(m.message)}</div>
       </div>`;
     } else if (m.message_type === 'system') {
-      wrap.innerHTML = `<div class="text-[11px] text-black/40 italic text-center w-full">${escapeHtml(m.message)}</div>`;
+      wrap.innerHTML = `<div class="text-[11px] italic text-center w-full" style="color:var(--text-3)">${escapeHtml(m.message)}</div>`;
     } else {
       wrap.innerHTML = `<div class="${isMe ? 'bubble-me' : 'bubble-them'}">
-        <div class="text-[10px] opacity-70 mb-0.5">${escapeHtml(m.sender_name || '')}</div>
+        <div class="text-[10px] mb-0.5" style="opacity:.65">${escapeHtml(m.sender_name || '')}</div>
         ${escapeHtml(m.message)}
       </div>`;
     }
     log.appendChild(wrap);
   });
   log.scrollTop = log.scrollHeight;
-}
-
-/* Rich payment card with USSD + transfer flow */
-function buildPaymentCard(m, isMe) {
-  const card = document.createElement('div');
-  card.className = 'pay-card';
-  const bank = BANKS.find(b => b.id === m.bank_id) || null;
-  const bankName = bank?.name || m.bank_name || '—';
-  const acct = m.account_number || '—';
-  const acctName = m.account_name || '—';
-  const amount = Number(m.amount || 0);
-
-  const header = `
-    <div class="flex items-center justify-between mb-3">
-      <div class="flex items-center gap-2">
-        <span class="w-8 h-8 rounded-lg bg-[#c9a227]/20 text-[#7a5c0f] flex items-center justify-center text-sm font-bold">₦</span>
-        <span class="text-[11px] font-bold uppercase tracking-wider text-[#7a5c0f]">Payment Request</span>
-      </div>
-      <span class="badge ${m._paid ? 'badge-green' : 'badge-gold'}">${m._paid ? 'paid' : 'pending'}</span>
-    </div>
-    <div class="text-3xl font-black tracking-tight serif">${money(amount)}</div>
-    ${m.message ? `<div class="text-xs text-black/60 mt-2 italic">"${escapeHtml(m.message)}"</div>` : ''}
-  `;
-
-  const details = `
-    <div class="mt-4 space-y-2 text-sm bg-[#faf8f3] rounded-xl p-3 border border-black/5">
-      <div class="flex items-center justify-between gap-3">
-        <span class="text-black/50 text-xs uppercase tracking-wider">Bank</span>
-        <span class="font-semibold">${escapeHtml(bankName)}</span>
-      </div>
-      <div class="flex items-center justify-between gap-3">
-        <span class="text-black/50 text-xs uppercase tracking-wider">Account</span>
-        <div class="flex items-center gap-2">
-          <span class="font-mono font-bold">${escapeHtml(acct)}</span>
-          <button class="btn btn-ghost btn-sm !py-1 !px-2 !text-[11px] copy-acct" data-text="${escapeHtml(acct)}">Copy</button>
-        </div>
-      </div>
-      <div class="flex items-center justify-between gap-3">
-        <span class="text-black/50 text-xs uppercase tracking-wider">Name</span>
-        <span class="font-semibold text-right">${escapeHtml(acctName)}</span>
-      </div>
-    </div>
-  `;
-
-  const actions = !isMe && !m._paid ? `
-    <div class="mt-4 grid grid-cols-2 gap-2">
-      <button class="btn btn-gold btn-sm pay-ussd-btn">📱 Pay via USSD</button>
-      <button class="btn btn-ghost btn-sm pay-transfer-btn">🏦 Bank Transfer</button>
-    </div>
-    <div class="ussd-panel hidden mt-3"></div>
-    <div class="transfer-panel hidden mt-3">
-      <div class="text-xs font-bold uppercase tracking-wider text-black/60 mb-2">Transfer details</div>
-      <div class="text-xs text-black/60 mb-3">
-        Open your bank app or dial your bank's USSD, and send <b>${money(amount)}</b> to the account above.
-        Tap <b>Ask tailor</b> in the chat if anything is unclear.
-      </div>
-      <button class="btn btn-ghost btn-sm w-full mark-paid">✓ I have sent the payment</button>
-    </div>
-  ` : isMe && !m._paid ? `
-    <div class="mt-3 text-xs text-black/50 text-center italic">Waiting for client to confirm payment…</div>
-  ` : '';
-
-  card.innerHTML = header + details + actions;
-
-  // Wire copy button
-  card.querySelector('.copy-acct')?.addEventListener('click', (e) => {
-    e.stopPropagation();
-    copyText(acct, e.currentTarget);
-  });
-
-  // USSD toggle
-  card.querySelector('.pay-ussd-btn')?.addEventListener('click', (e) => {
-    e.stopPropagation();
-    const panel = card.querySelector('.ussd-panel');
-    panel.classList.toggle('hidden');
-    if (!panel.dataset.filled) {
-      panel.innerHTML = buildUssdPanel(acct, amount);
-      panel.dataset.filled = '1';
-      wireUssdPanel(panel, acct, amount);
-    }
-  });
-
-  // Transfer toggle
-  card.querySelector('.pay-transfer-btn')?.addEventListener('click', (e) => {
-    e.stopPropagation();
-    card.querySelector('.transfer-panel')?.classList.toggle('hidden');
-  });
-
-  // Mark paid
-  card.querySelector('.mark-paid')?.addEventListener('click', async (e) => {
-    e.stopPropagation();
-    await db.createMessage({
-      order_id: state.activeOrderId,
-      sender_id: state.user.id,
-      sender_name: 'System',
-      message: `Client marked payment of ${money(amount)} as sent. Awaiting tailor confirmation.`,
-      message_type: 'payment_confirmed',
-      amount
-    });
-    await loadChat(state.activeOrderId);
-    toast('Tailor notified — awaiting confirmation.', 'success');
-  });
-
-  return card;
-}
-
-/* USSD picker panel — shows all banks with USSD codes pre-filled */
-function buildUssdPanel(account, amount) {
-  const rows = BANKS.map(b => {
-    if (!b.ussd) {
-      return `
-        <div class="bank-chip" data-bank="${b.id}" data-app="1">
-          <span class="bank-dot" style="background:${b.color}"></span>
-          <span>${escapeHtml(b.name)}</span>
-        </div>`;
-    }
-    const code = b.ussd.replace('{amount}', amount).replace('{account}', account);
-    return `
-      <div class="bank-chip" data-bank="${b.id}" data-ussd="${escapeHtml(code)}">
-        <span class="bank-dot" style="background:${b.color}"></span>
-        <span>${escapeHtml(b.name)}</span>
-      </div>`;
-  }).join('');
-
-  return `
-    <div class="text-xs font-bold uppercase tracking-wider text-black/60 mb-2">Step 1 · Pick your bank</div>
-    <div class="bank-grid">${rows}</div>
-    <div class="ussd-result hidden mt-4">
-      <div class="text-xs font-bold uppercase tracking-wider text-black/60 mb-2">Step 2 · Dial this code</div>
-      <div class="ussd-code" id="ussd-display">—</div>
-      <button class="btn btn-primary btn-sm w-full mt-3 copy-ussd">Copy USSD code</button>
-      <p class="text-[11px] text-black/50 mt-3 text-center leading-relaxed">
-        If dialing doesn't work, open your bank app and transfer <b>${money(amount)}</b> to
-        <b>${escapeHtml(account)}</b> instead.
-      </p>
-    </div>
-  `;
-}
-
-function wireUssdPanel(panel, account, amount) {
-  panel.querySelectorAll('.bank-chip').forEach(chip => {
-    chip.addEventListener('click', () => {
-      panel.querySelectorAll('.bank-chip').forEach(c => c.classList.remove('selected'));
-      chip.classList.add('selected');
-
-      const result = panel.querySelector('.ussd-result');
-      const display = panel.querySelector('#ussd-display');
-      const copyBtn = panel.querySelector('.copy-ussd');
-      result.classList.remove('hidden');
-
-      if (chip.dataset.ussd) {
-        display.textContent = chip.dataset.ussd;
-        copyBtn.classList.remove('hidden');
-        copyBtn.onclick = () => copyText(chip.dataset.ussd, copyBtn);
-      } else {
-        const bank = BANKS.find(b => b.id === chip.dataset.bank);
-        display.textContent = bank?.note || 'Open the app to transfer.';
-        copyBtn.classList.add('hidden');
-      }
-    });
-  });
 }
 
 async function sendChat() {
@@ -795,61 +900,15 @@ async function askBestWayToPay() {
     order_id: state.activeOrderId,
     sender_id: state.user.id,
     sender_name: state.user.full_name,
-    message: `${state.user.full_name} is asking: please advise the best way to pay — bank transfer or USSD?`,
+    message: `${state.user.full_name} is asking: please advise the best way to pay — bank transfer, USSD, or cash?`,
     message_type: 'ask_payment'
   });
   await loadChat(state.activeOrderId);
-  toast('Your tailor has been asked.', 'success');
-}
-
-async function sendPaymentRequest() {
-  const amount = Number($('pr-amount')?.value);
-  const method = $('pr-method')?.value || 'bank_transfer';
-  const bankId = $('pr-bank')?.value || '';
-  const acctNum = ($('pr-account-number')?.value || '').trim();
-  const acctName = ($('pr-account-name')?.value || '').trim();
-  const notes = ($('pr-notes')?.value || '').trim();
-
-  if (!amount || amount <= 0) return toast('Enter a valid amount.', 'error');
-  if (!bankId)                return toast('Select your bank.', 'error');
-  if (!acctNum)               return toast('Enter account number.', 'error');
-  if (!acctName)              return toast('Enter account name.', 'error');
-
-  const bank = BANKS.find(b => b.id === bankId);
-  const order = state.orders.find(o => o.id === state.activeOrderId);
-  if (!order) return;
-
-  await db.createMessage({
-    order_id: state.activeOrderId,
-    sender_id: state.user.id,
-    sender_name: state.user.full_name,
-    message: notes || `Please pay ${money(amount)} to complete this order.`,
-    message_type: 'payment_request',
-    amount, method,
-    bank_id: bankId,
-    bank_name: bank?.name || '',
-    account_number: acctNum,
-    account_name: acctName
-  });
-
-  await db.createPayment({
-    order_id: state.activeOrderId,
-    client_id: order.client_id,
-    tailor_id: state.user.id,
-    amount, method, notes,
-    bank_id: bankId,
-    bank_name: bank?.name || '',
-    account_number: acctNum,
-    account_name: acctName,
-    status: 'pending'
-  });
-
-  $('pay-request-form')?.classList.add('hidden');
-  ['pr-amount','pr-account-number','pr-account-name','pr-notes'].forEach(id => {
-    const el = $(id); if (el) el.value = '';
-  });
-  await loadChat(state.activeOrderId);
-  toast('Payment request sent to client.', 'success');
+  toast('Tailor notified. Opening WhatsApp…', 'success');
+  setTimeout(async () => {
+    const o = state.orders.find(x => x.id === state.activeOrderId);
+    if (o) await openWhatsAppForOrder(o);
+  }, 600);
 }
 
 async function advanceMilestone() {
@@ -869,7 +928,7 @@ async function advanceMilestone() {
     order_id: order.id,
     sender_id: state.user.id,
     sender_name: 'System',
-    message: `Milestone advanced to ${next}: ${MILESTONES[next-1]}`,
+    message: `Milestone advanced → ${next}. ${MILESTONES[next-1]}`,
     message_type: 'system'
   });
   await loadChat(order.id);
@@ -877,251 +936,63 @@ async function advanceMilestone() {
 }
 
 /* =============================================================
-   RENDER: PAYMENTS TAB (with bank details + quick USSD)
+   RENDER: PAY TAILOR
    ============================================================= */
 async function renderPayments() {
   state.payments = await db.listPayments();
   const el = $('payments-list'); if (!el) return;
+
   if (!state.payments.length) {
-    el.innerHTML = `<div class="empty-state">No payment requests yet.<br/>Open an order and tap <b>Ask tailor best way to pay</b>.</div>`;
+    if (!state.orders.length) {
+      el.innerHTML = `<div class="empty-state">No orders yet.<br/>
+        <span style="color: var(--gold);">Create a bespoke order to start →</span></div>`;
+      return;
+    }
+    el.innerHTML = `<div class="text-xs uppercase tracking-wider mb-3" style="color: var(--text-3); font-weight: 800;">Your orders</div>`;
+    state.orders.forEach(o => {
+      const card = document.createElement('div');
+      card.className = 'surface-2 p-4';
+      card.innerHTML = `
+        <div class="flex items-start justify-between gap-3 mb-3">
+          <div class="min-w-0">
+            <div class="font-bold text-sm truncate">${escapeHtml(o.garment_type || 'Order')}</div>
+            <div class="text-xs mt-0.5" style="color: var(--text-3);">${escapeHtml(fmtDate(o.created_at))} · Budget ${money(o.budget)}</div>
+          </div>
+          <span class="badge badge-gold">No payment yet</span>
+        </div>
+        <button class="btn btn-whatsapp btn-sm w-full wa-order-btn">
+          <svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px">
+            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347"/>
+          </svg>
+          Ask tailor on WhatsApp
+        </button>
+      `;
+      card.querySelector('.wa-order-btn')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openWhatsAppForOrder(o);
+      });
+      el.appendChild(card);
+    });
     return;
   }
+
   el.innerHTML = '';
   state.payments.forEach(p => {
     const card = document.createElement('div');
-    card.className = 'surface-soft p-4 border border-black/5';
-    const bank = BANKS.find(b => b.id === p.bank_id);
+    card.className = 'surface-2 p-4';
+    const order = state.orders.find(o => o.id === p.order_id);
+    const paid = p.status === 'paid';
     card.innerHTML = `
-      <div class="flex items-start justify-between gap-3">
+      <div class="flex items-start justify-between gap-3 mb-3">
         <div class="min-w-0">
-          <div class="text-xl font-black serif">${money(p.amount)}</div>
-          <div class="text-xs text-black/50 mt-1">
-            ${escapeHtml(bank?.name || p.bank_name || 'Bank')} · <span class="font-mono">${escapeHtml(p.account_number||'—')}</span>
+          <div class="text-xl font-black serif" style="color: var(--gold);">${money(p.amount)}</div>
+          <div class="text-xs mt-1" style="color: var(--text-3);">
+            ${escapeHtml(order?.garment_type || 'Order')} · ${escapeHtml(fmtDate(p.created_at))}
           </div>
-          ${p.notes ? `<div class="text-xs text-black/60 mt-1 italic">"${escapeHtml(p.notes)}"</div>` : ''}
+          ${p.notes ? `<div class="text-xs mt-2 italic" style="color: var(--text-2);">"${escapeHtml(p.notes)}"</div>` : ''}
         </div>
-        <span class="badge ${p.status === 'paid' ? 'badge-green' : p.status === 'failed' ? 'badge-red' : 'badge-gold'}">
-          ${escapeHtml(p.status)}
-        </span>
+        <span class="badge ${paid ? 'badge-green' : 'badge-gold'}">${escapeHtml(p.status)}</span>
       </div>
-      ${p.status !== 'paid' && p.account_number ? `
-        <div class="mt-3 flex gap-2">
-          <button class="btn btn-ghost btn-sm flex-1 quick-ussd">📱 USSD options</button>
-          <button class="btn btn-ghost btn-sm flex-1 quick-copy">Copy account</button>
-        </div>
-        <div class="quick-ussd-panel hidden mt-3"></div>
-      ` : ''}
-    `;
-
-    card.querySelector('.quick-copy')?.addEventListener('click', (e) =>
-      copyText(p.account_number || '', e.currentTarget));
-
-    card.querySelector('.quick-ussd')?.addEventListener('click', (e) => {
-      const panel = card.querySelector('.quick-ussd-panel');
-      panel.classList.toggle('hidden');
-      if (!panel.dataset.filled) {
-        panel.innerHTML = buildUssdPanel(p.account_number || '', p.amount || 0);
-        panel.dataset.filled = '1';
-        wireUssdPanel(panel, p.account_number || '', p.amount || 0);
-      }
-    });
-
-    el.appendChild(card);
-  });
-}
-
-/* =============================================================
-   RENDER: MARKET
-   ============================================================= */
-async function renderMarket() {
-  state.listings = await db.listListings();
-  const q = ($('market-search')?.value || '').toLowerCase().trim();
-  let items = state.listings;
-  if (q) items = items.filter(l =>
-    (String(l.title||'') + ' ' + String(l.description||'')).toLowerCase().includes(q));
-  const grid = $('market-grid'); if (!grid) return;
-  if (!items.length) {
-    grid.innerHTML = `<div class="col-span-full empty-state">No listings yet. Be the first to list a pre-loved piece.</div>`;
-    return;
-  }
-  grid.innerHTML = items.map(l => `
-    <div class="surface overflow-hidden group">
-      <div class="aspect-square bg-[#f3efe4] flex items-center justify-center text-5xl text-black/15">
-        ${l.image_url
-          ? `<img src="${escapeHtml(l.image_url)}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" onerror="this.style.display='none';this.parentElement.textContent='👜'" />`
-          : '👜'}
-      </div>
-      <div class="p-4">
-        <div class="font-bold text-sm truncate">${escapeHtml(l.title)}</div>
-        <div class="text-xs text-black/50 truncate mt-0.5">${escapeHtml(l.size||'')} · ${escapeHtml(l.condition||'')}</div>
-        <div class="flex items-center justify-between mt-3">
-          <div class="font-black text-base">${money(l.price)}</div>
-          <span class="badge ${l.status==='available'?'badge-green':'badge-gray'}">${escapeHtml(l.status)}</span>
-        </div>
-      </div>
-    </div>
-  `).join('');
-}
-
-/* =============================================================
-   RENDER: APPLICATIONS
-   ============================================================= */
-async function renderApplications() {
-  state.applications = await db.listApplications();
-  const el = $('apps-list'); if (!el) return;
-  if (!state.applications.length) {
-    el.innerHTML = `<li class="empty-state">No applications yet.</li>`;
-    return;
-  }
-  el.innerHTML = state.applications.map(a => `
-    <li class="surface-soft p-4">
-      <div class="flex items-start justify-between gap-3">
-        <div class="min-w-0">
-          <div class="font-bold text-sm">${escapeHtml(a.full_name||'Applicant')}</div>
-          <div class="text-xs text-black/50 truncate mt-0.5">${escapeHtml(a.email||'')} · ${a.years_experience || 0} yr exp</div>
-          ${a.portfolio_url
-            ? `<a href="${escapeHtml(a.portfolio_url)}" target="_blank" rel="noopener" class="text-xs text-[#8a6d00] underline mt-1 inline-block">Portfolio →</a>`
-            : ''}
-        </div>
-        <span class="badge ${a.status==='accepted'?'badge-green':a.status==='rejected'?'badge-red':'badge-gold'}">${escapeHtml(a.status)}</span>
-      </div>
-    </li>
-  `).join('');
-}
-
-/* =============================================================
-   FORM HANDLERS
-   ============================================================= */
-async function submitOrder(e) {
-  e.preventDefault();
-  const payload = {
-    client_id: state.user.id,
-    garment_type: $('order-garment')?.value || '',
-    description:  $('order-desc')?.value.trim() || '',
-    pinterest_url:$('order-pinterest')?.value.trim() || '',
-    measurements: {
-      bust:  $('m-bust')?.value  ? Number($('m-bust').value)  : null,
-      waist: $('m-waist')?.value ? Number($('m-waist').value) : null,
-      hips:  $('m-hips')?.value  ? Number($('m-hips').value)  : null
-    },
-    budget: Number($('order-budget')?.value) || 0,
-    milestone: 1, status: 'pending'
-  };
-  if (!payload.garment_type) return toast('Please select a garment type.', 'error');
-  const row = await db.createOrder(payload);
-  state.orders.unshift(row);
-  e.target.reset();
-  renderOrders();
-  toast('Bespoke order submitted.', 'success');
-}
-
-async function submitListing(e) {
-  e.preventDefault();
-  const payload = {
-    seller_id:   state.user.id,
-    seller_name: state.user.full_name,
-    title:       $('list-title')?.value.trim() || '',
-    description: $('list-desc')?.value.trim() || '',
-    price:       Number($('list-price')?.value) || 0,
-    size:        $('list-size')?.value.trim() || '',
-    condition:   $('list-condition')?.value || '',
-    image_url:   $('list-image')?.value.trim() || '',
-    status:      'available'
-  };
-  if (!payload.title || !payload.price) return toast('Title and price required.', 'error');
-  const row = await db.createListing(payload);
-  state.listings.unshift(row);
-  e.target.reset();
-  renderMarket();
-  toast('Listing published.', 'success');
-}
-
-async function submitApplication(e) {
-  e.preventDefault();
-  const payload = {
-    applicant_id: state.user.id, mentor_id: null,
-    full_name: $('app-name')?.value.trim() || '',
-    email: $('app-email')?.value.trim() || '',
-    portfolio_url: $('app-portfolio')?.value.trim() || '',
-    cover_letter: $('app-cover')?.value.trim() || '',
-    years_experience: Number($('app-years')?.value) || 0,
-    status: 'pending'
-  };
-  if (!payload.full_name || !payload.email) return toast('Name and email are required.', 'error');
-  const row = await db.createApplication(payload);
-  state.applications.unshift(row);
-  e.target.reset();
-  renderApplications();
-  toast('Application submitted.', 'success');
-}
-
-/* =============================================================
-   REFRESH
-   ============================================================= */
-async function refreshAll() {
-  if (!state.user) return;
-  try {
-    state.orders       = await db.listOrders();
-    state.listings     = await db.listListings();
-    state.applications = await db.listApplications();
-    state.payments     = await db.listPayments();
-    renderOrders(); renderMarket(); renderApplications(); renderPayments();
-  } catch (err) { console.error('[StitchLuxe] refresh error', err); }
-}
-
-/* =============================================================
-   INIT
-   ============================================================= */
-function init() {
-  const yearEl = $('footer-year');
-  if (yearEl) yearEl.textContent = new Date().getFullYear();
-  console.log('[StitchLuxe] init · mode:', useLocal ? 'LOCAL FALLBACK' : 'SUPABASE');
-
-  try {
-    const saved = lsRead(CONFIG.LS_SESSION, null);
-    if (saved?.id && saved?.email) {
-      console.log('[StitchLuxe] restoring session for', saved.email);
-      startSession(saved);
-    }
-  } catch (e) { console.warn('[StitchLuxe] session restore failed:', e); }
-
-  $('auth-form')?.addEventListener('submit', handleLogin);
-  $('btn-signup')?.addEventListener('click', handleSignup);
-  $('btn-demo')?.addEventListener('click', handleDemo);
-  $('btn-logout')?.addEventListener('click', handleLogout);
-
-  document.querySelectorAll('.tab-btn').forEach(b =>
-    b.addEventListener('click', () => switchTab(b.dataset.tab)));
-
-  $('form-order')?.addEventListener('submit', submitOrder);
-  $('form-listing')?.addEventListener('submit', submitListing);
-  $('form-apprentice')?.addEventListener('submit', submitApplication);
-
-  $('order-search')?.addEventListener('input', renderOrders);
-  $('market-search')?.addEventListener('input', renderMarket);
-
-  $('btn-close-order')?.addEventListener('click', () => {
-    $('modal-order')?.classList.add('hidden');
-    state.activeOrderId = null;
-  });
-  $('btn-send-chat')?.addEventListener('click', sendChat);
-  $('chat-input')?.addEventListener('keypress', e => { if (e.key === 'Enter') sendChat(); });
-  $('btn-ask-pay')?.addEventListener('click', askBestWayToPay);
-  $('btn-request-pay')?.addEventListener('click', () => {
-    populateBankSelect();
-    $('pay-request-form')?.classList.toggle('hidden');
-  });
-  $('btn-cancel-pay-req')?.addEventListener('click', () => $('pay-request-form')?.classList.add('hidden'));
-  $('btn-send-pay-req')?.addEventListener('click', sendPaymentRequest);
-  $('btn-advance-ms')?.addEventListener('click', advanceMilestone);
-
-  // hygiene
-  delete window.STITCHLUXE_SUPABASE_URL;
-  delete window.STITCHLUXE_SUPABASE_ANON_KEY;
-}
-
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', init);
-} else {
-  init();
-}
+      ${!paid ? `
+        <button class="btn btn-whatsapp btn-sm w-full wa-pay-btn">
+          <svg viewBox="0 0 24 24"
