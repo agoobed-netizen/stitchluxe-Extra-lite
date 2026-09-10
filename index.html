@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>StitchLuxe Extra Lite — Bespoke • Resale • Apprenticeship</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://js.paystack.co/v1/inline.js"></script>
+<style>
+  :root { --gold: #c9a227; --ink: #0f0e0c; }
+  body { font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; background:#faf8f3; color: var(--ink); }
+  .tab-active { background: var(--ink); color: #fff; }
+  .gold { color: var(--gold); }
+  .badge { display:inline-flex; align-items:center; padding:2px 10px; border-radius:999px; font-size:11px; font-weight:600; }
+  .ms-step.done { background: var(--gold); color:#000; }
+  .ms-step.active { background: var(--ink); color:#fff; }
+  .toast { animation: slide .35s ease-out; }
+  @keyframes slide { from{transform:translateY(-20px);opacity:0} to{transform:translateY(0);opacity:1} }
+  .hidden { display:none !important; }
+  .scroll-x { overflow-x:auto; scrollbar-width:none; }
+  .scroll-x::-webkit-scrollbar { display:none; }
+</style>
+</head>
+<body class="min-h-screen">
+
+<!-- TOAST -->
+<div id="toast-wrap" class="fixed top-4 right-4 z-[999] space-y-2"></div>
+
+<!-- =============== AUTH GATE =============== -->
+<section id="auth-gate" class="min-h-screen flex items-center justify-center p-4">
+  <div class="w-full max-w-md bg-white rounded-3xl shadow-xl p-8 border border-black/5">
+    <div class="text-center mb-6">
+      <div class="text-3xl font-black tracking-tight">Stitch<span class="gold">Luxe</span></div>
+      <p class="text-xs uppercase tracking-widest text-black/40 mt-1">Extra Lite • v2.1</p>
+    </div>
+    <div id="auth-error" class="hidden mb-4 text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl p-3"></div>
+    <form id="auth-form" class="space-y-4">
+      <div>
+        <label for="auth-name" class="text-xs font-semibold uppercase tracking-wide text-black/60">Full name (signup only)</label>
+        <input id="auth-name" type="text" autocomplete="name"
+               class="w-full mt-1 px-4 py-3 rounded-xl border border-black/10 bg-[#faf8f3] focus:outline-none focus:ring-2 focus:ring-[#c9a227]"
+               placeholder="Ada Obi" />
+      </div>
+      <div>
+        <label for="auth-email" class="text-xs font-semibold uppercase tracking-wide text-black/60">Email</label>
+        <input id="auth-email" type="email" required autocomplete="email"
+               class="w-full mt-1 px-4 py-3 rounded-xl border border-black/10 bg-[#faf8f3] focus:outline-none focus:ring-2 focus:ring-[#c9a227]"
+               placeholder="designer@stitchluxe.com" />
+      </div>
+      <div>
+        <label for="auth-password" class="text-xs font-semibold uppercase tracking-wide text-black/60">Password</label>
+        <input id="auth-password" type="password" required autocomplete="current-password" minlength="6"
+               class="w-full mt-1 px-4 py-3 rounded-xl border border-black/10 bg-[#faf8f3] focus:outline-none focus:ring-2 focus:ring-[#c9a227]"
+               placeholder="••••••••" />
+      </div>
+      <div>
+        <label for="auth-role" class="text-xs font-semibold uppercase tracking-wide text-black/60">Role</label>
+        <select id="auth-role" class="w-full mt-1 px-4 py-3 rounded-xl border border-black/10 bg-[#faf8f3]">
+          <option value="client">Client (Bespoke buyer / Seller)</option>
+          <option value="tailor">Master Tailor (Admin)</option>
+        </select>
+      </div>
+      <button id="btn-login" type="submit"
+              class="w-full bg-[#0f0e0c] hover:bg-black text-white font-semibold py-3 rounded-xl transition">
+        Sign In
+      </button>
+      <div class="flex gap-2">
+        <button id="btn-signup" type="button"
+                class="flex-1 border border-black/10 hover:bg-black/5 font-medium py-3 rounded-xl text-sm transition">
+          Create Account
+        </button>
+        <button id="btn-demo" type="button"
+                class="flex-1 bg-[#c9a227] hover:opacity-90 text-black font-semibold py-3 rounded-xl text-sm transition">
+          Demo User
+        </button>
+      </div>
+      <p class="text-[11px] text-center text-black/40 leading-relaxed pt-2">
+        Demo: <span class="font-mono">designer@stitchluxe.com</span> / <span class="font-mono">stitchluxe123</span><br />
+        Admin: <span class="font-mono">mastertailor@stitchluxe.com</span>
+      </p>
+    </form>
+  </div>
+</section>
+
+<!-- =============== APP SHELL =============== -->
+<div id="app-shell" class="hidden min-h-screen flex flex-col">
+  <!-- HEADER -->
+  <header class="bg-white border-b border-black/5 sticky top-0 z-40">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="text-xl font-black tracking-tight">Stitch<span class="gold">Luxe</span>
+        <span class="ml-2 text-[10px] align-top badge bg-black/5 text-black/60">EXTRA LITE</span>
+      </div>
+      <div class="flex items-center gap-3">
+        <div class="text-right hidden sm:block">
+          <div id="user-name-display" class="text-sm font-semibold leading-tight">—</div>
+          <div id="user-role-display" class="text-[10px] uppercase tracking-wide text-black/40">—</div>
+        </div>
+        <div id="user-avatar" class="w-9 h-9 rounded-full bg-[#c9a227] text-black flex items-center justify-center font-bold text-sm">?</div>
+        <button id="btn-logout" class="text-xs text-black/60 hover:text-black border border-black/10 rounded-lg px-3 py-2">Logout</button>
+      </div>
+    </div>
+    <!-- TABS -->
+    <nav class="max-w-6xl mx-auto px-4 pb-3 flex gap-2 scroll-x">
+      <button data-tab="orders"     class="tab-btn tab-active whitespace-nowrap text-sm font-semibold px-4 py-2 rounded-full border border-black/10">🧵 Bespoke Orders</button>
+      <button data-tab="market"     class="tab-btn whitespace-nowrap text-sm font-semibold px-4 py-2 rounded-full border border-black/10">👜 Resale Market</button>
+      <button data-tab="apprentice" class="tab-btn whitespace-nowrap text-sm font-semibold px-4 py-2 rounded-full border border-black/10">🎓 Apprenticeship</button>
+      <button data-tab="payments"   class="tab-btn whitespace-nowrap text-sm font-semibold px-4 py-2 rounded-full border border-black/10">💳 Payments</button>
+    </nav>
+  </header>
+
+  <main class="flex-1 max-w-6xl mx-auto w-full px-4 py-6 space-y-6">
+
+    <!-- =============== TAB: ORDERS =============== -->
+    <section id="tab-orders" class="tab-panel space-y-6">
+      <div class="grid md:grid-cols-2 gap-6">
+        <!-- New Order -->
+        <div class="bg-white rounded-2xl border border-black/5 p-5 shadow-sm">
+          <h2 class="font-bold text-lg mb-4">New Bespoke Order</h2>
+          <form id="form-order" class="space-y-3">
+            <div>
+              <label for="order-garment" class="text-xs font-semibold uppercase text-black/60">Garment type</label>
+              <select id="order-garment" required class="w-full mt-1 px-3 py-2.5 rounded-lg border border-black/10 bg-[#faf8f3]">
+                <option value="">Select…</option>
+                <option>Agbada</option><option>Ankara Gown</option><option>Kaftan</option>
+                <option>Bridal / Aso Ebi</option><option>Suit (2-piece)</option>
+                <option>Senator / Kaftan Set</option><option>Other</option>
+              </select>
+            </div>
+            <div>
+              <label for="order-desc" class="text-xs font-semibold uppercase text-black/60">Description / brief</label>
+              <textarea id="order-desc" rows="3" placeholder="Style details, colours, fabric preference…"
+                        class="w-full mt-1 px-3 py-2.5 rounded-lg border border-black/10 bg-[#faf8f3]"></textarea>
+            </div>
+            <div>
+              <label for="order-pinterest" class="text-xs font-semibold uppercase text-black/60">Pinterest reference URL</label>
+              <input id="order-pinterest" type="url" placeholder="https://pin.it/..."
+                     class="w-full mt-1 px-3 py-2.5 rounded-lg border border-black/10 bg-[#faf8f3]" />
+            </div>
+            <div class="grid grid-cols-3 gap-2">
+              <div>
+                <label for="m-bust" class="text-[10px] font-semibold uppercase text-black/60">Bust (in)</label>
+                <input id="m-bust" type="number" step="0.1" class="w-full mt-1 px-2 py-2 rounded-lg border border-black/10 bg-[#faf8f3] text-sm" />
+              </div>
+              <div>
+                <label for="m-waist" class="text-[10px] font-semibold uppercase text-black/60">Waist (in)</label>
+                <input id="m-waist" type="number" step="0.1" class="w-full mt-1 px-2 py-2 rounded-lg border border-black/10 bg-[#faf8f3] text-sm" />
+              </div>
+              <div>
+                <label for="m-hips" class="text-[10px] font-semibold uppercase text-black/60">Hips (in)</label>
+                <input id="m-hips" type="number" step="0.1" class="w-full mt-1 px-2 py-2 rounded-lg border border-black/10 bg-[#faf8f3] text-sm" />
+              </div>
+            </div>
+            <div>
+              <label for="order-budget" class="text-xs font-semibold uppercase text-black/60">Budget (₦)</label>
+              <input id="order-budget" type="number" min="0" step="500" placeholder="120000"
+                     class="w-full mt-1 px-3 py-2.5 rounded-lg border border-black/10 bg-[#faf8f3]" />
+            </div>
+            <button type="submit"
+                    class="w-full bg-[#0f0e0c] hover:bg-black text-white font-semibold py-3 rounded-xl transition">
+              Submit Order
+            </button>
+          </form>
+        </div>
+
+        <!-- Orders List -->
+        <div class="bg-white rounded-2xl border border-black/5 p-5 shadow-sm">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="font-bold text-lg">Your Orders</h2>
+            <input id="order-search" type="search" placeholder="Search…"
+                   class="text-sm px-3 py-1.5 rounded-lg border border-black/10 bg-[#faf8f3] w-32" />
+          </div>
+          <ul id="list-root" class="space-y-3 max-h-[520px] overflow-y-auto pr-1"></ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- =============== TAB: MARKETPLACE =============== -->
+    <section id="tab-market" class="tab-panel hidden space-y-6">
+      <div class="grid md:grid-cols-3 gap-6">
+        <div class="bg-white rounded-2xl border border-black/5 p-5 shadow-sm md:col-span-1">
+          <h2 class="font-bold text-lg mb-4">List an Item</h2>
+          <form id="form-listing" class="space-y-3">
+            <div>
+              <label for="list-title" class="text-xs font-semibold uppercase text-black/60">Title</label>
+              <input id="list-title" required class="w-full mt-1 px-3 py-2.5 rounded-lg border border-black/10 bg-[#faf8f3]" />
+            </div>
+            <div>
+              <label for="list-desc" class="text-xs font-semibold uppercase text-black/60">Description</label>
+              <textarea id="list-desc" rows="2" class="w-full mt-1 px-3 py-2.5 rounded-lg border border-black/10 bg-[#faf8f3]"></textarea>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label for="list-price" class="text-xs font-semibold uppercase text-black/60">Price (₦)</label>
+                <input id="list-price" type="number" min="0" required class="w-full mt-1 px-3 py-2.5 rounded-lg border border-black/10 bg-[#faf8f3]" />
+              </div>
+              <div>
+                <label for="list-size" class="text-xs font-semibold uppercase text-black/60">Size</label>
+                <input id="list-size" placeholder="M / 12 / 40" class="w-full mt-1 px-3 py-2.5 rounded-lg border border-black/10 bg-[#faf8f3]" />
+              </div>
+            </div>
+            <div>
+              <label for="list-condition" class="text-xs font-semibold uppercase text-black/60">Condition</label>
+              <select id="list-condition" class="w-full mt-1 px-3 py-2.5 rounded-lg border border-black/10 bg-[#faf8f3]">
+                <option>New with tags</option><option>Like new</option><option>Gently used</option><option>Vintage</option>
+              </select>
+            </div>
+            <div>
+              <label for="list-image" class="text-xs font-semibold uppercase text-black/60">Image URL</label>
+              <input id="list-image" type="url" placeholder="https://…" class="w-full mt-1 px-3 py-2.5 rounded-lg border border-black/10 bg-[#faf8f3]" />
+            </div>
+            <button type="submit" class="w-full bg-[#0f0e0c] hover:bg-black text-white font-semibold py-3 rounded-xl">Publish Listing</button>
+          </form>
+        </div>
+        <div class="md:col-span-2">
+          <div class="flex items-center justify-between mb-3">
+            <h2 class="font-bold text-lg">Pre-loved Luxury</h2>
+            <input id="market-search" type="search" placeholder="Search items…"
+                   class="text-sm px-3 py-1.5 rounded-lg border border-black/10 bg-white w-40" />
+          </div>
+          <div id="market-grid" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =============== TAB: APPRENTICESHIP =============== -->
+    <section id="tab-apprentice" class="tab-panel hidden space-y-6">
+      <div class="grid md:grid-cols-2 gap-6">
+        <div class="bg-white rounded-2xl border border-black/5 p-5 shadow-sm">
+          <h2 class="font-bold text-lg mb-4">Apply for Apprenticeship</h2>
+          <form id="form-apprentice" class="space-y-3">
+            <div>
+              <label for="app-name" class="text-xs font-semibold uppercase text-black/60">Full name</label>
+              <input id="app-name" required class="w-full mt-1 px-3 py-2.5 rounded-lg border border-black/10 bg-[#faf8f3]" />
+            </div>
+            <div>
+              <label for="app-email" class="text-xs font-semibold uppercase text-black/60">Email</label>
+              <input id="app-email" type="email" required class="w-full mt-1 px-3 py-2.5 rounded-lg border border-black/10 bg-[#faf8f3]" />
+            </div>
+            <div>
+              <label for="app-portfolio" class="text-xs font-semibold uppercase text-black/60">Portfolio URL</label>
+              <input id="app-portfolio" type="url" placeholder="https://…" class="w-full mt-1 px-3 py-2.5 rounded-lg border border-black/10 bg-[#faf8f3]" />
+            </div>
+            <div>
+              <label for="app-years" class="text-xs font-semibold uppercase text-black/60">Years of experience</label>
+              <input id="app-years" type="number" min="0" value="0" class="w-full mt-1 px-3 py-2.5 rounded-lg border border-black/10 bg-[#faf8f3]" />
+            </div>
+            <div>
+              <label for="app-cover" class="text-xs font-semibold uppercase text-black/60">Cover letter</label>
+              <textarea id="app-cover" rows="4" class="w-full mt-1 px-3 py-2.5 rounded-lg border border-black/10 bg-[#faf8f3]"></textarea>
+            </div>
+            <button type="submit" class="w-full bg-[#0f0e0c] hover:bg-black text-white font-semibold py-3 rounded-xl">Submit Application</button>
+          </form>
+        </div>
+        <div class="bg-white rounded-2xl border border-black/5 p-5 shadow-sm">
+          <h2 class="font-bold text-lg mb-4">Applications</h2>
+          <ul id="apps-list" class="space-y-3"></ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- =============== TAB: PAYMENTS =============== -->
+    <section id="tab-payments" class="tab-panel hidden space-y-6">
+      <div class="bg-white rounded-2xl border border-black/5 p-5 shadow-sm">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="font-bold text-lg">Payment Requests</h2>
+          <span class="text-xs text-black/50">Card via Paystack • Transfer • USSD • Cash • Installments</span>
+        </div>
+        <div id="payments-list" class="space-y-3"></div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="border-t border-black/5 py-6 mt-8">
+    <div class="max-w-6xl mx-auto px-4 text-center text-xs text-black/50">
+      © <span id="footer-year">2025</span> StitchLuxe Extra Lite • Lagos, Nigeria • Made with ♥ for couture
+    </div>
+  </footer>
+</div>
+
+<!-- =============== ORDER DETAIL MODAL =============== -->
+<div id="modal-order" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm p-3 sm:p-6 overflow-y-auto">
+  <div class="max-w-2xl mx-auto bg-white rounded-3xl shadow-2xl overflow-hidden">
+    <div class="p-5 border-b border-black/5 flex items-start justify-between gap-4">
+      <div>
+        <h3 id="modal-order-title" class="font-bold text-lg">Order</h3>
+        <p id="modal-order-meta" class="text-xs text-black/50 mt-0.5">—</p>
+      </div>
+      <button id="btn-close-order" class="text-black/40 hover:text-black text-xl leading-none">✕</button>
+    </div>
+
+    <!-- Milestones -->
+    <div class="px-5 pt-4">
+      <div class="text-[10px] uppercase font-bold tracking-wider text-black/40 mb-2">Production Milestones</div>
+      <div id="milestone-bar" class="flex items-center gap-1"></div>
+    </div>
+
+    <!-- Pinterest ref -->
+    <div id="modal-pinterest-wrap" class="px-5 pt-4 hidden">
+      <a id="modal-pinterest" href="#" target="_blank" rel="noopener"
+         class="inline-flex items-center gap-2 text-xs bg-red-50 text-red-600 font-semibold px-3 py-2 rounded-full hover:bg-red-100">
+        📌 Pinterest Reference
+      </a>
+    </div>
+
+    <!-- Measurements -->
+    <div class="px-5 pt-4">
+      <div class="text-[10px] uppercase font-bold tracking-wider text-black/40 mb-1">Measurements</div>
+      <div id="modal-measurements" class="text-sm text-black/70">—</div>
+    </div>
+
+    <!-- Chat -->
+    <div class="px-5 pt-5 pb-2">
+      <div class="text-[10px] uppercase font-bold tracking-wider text-black/40 mb-2">Order Chat</div>
+      <div id="chat-log" class="bg-[#faf8f3] rounded-2xl p-4 h-72 overflow-y-auto space-y-3 text-sm"></div>
+    </div>
+
+    <!-- Actions -->
+    <div class="px-5 pb-3 flex flex-wrap gap-2">
+      <button id="btn-ask-pay" class="text-xs bg-[#c9a227] text-black font-semibold px-3 py-2 rounded-full hover:opacity-90">
+        💬 Ask tailor best way to pay
+      </button>
+      <button id="btn-request-pay" class="text-xs bg-black text-white font-semibold px-3 py-2 rounded-full hover:opacity-90 hidden">
+        💳 Request Payment
+      </button>
+      <button id="btn-advance-ms" class="text-xs border border-black/15 font-semibold px-3 py-2 rounded-full hover:bg-black/5 hidden">
+        ▶ Advance Milestone
+      </button>
+    </div>
+
+    <!-- Chat input -->
+    <div class="border-t border-black/5 p-4 flex gap-2 bg-white">
+      <input id="chat-input" placeholder="Type a message…"
+             class="flex-1 px-4 py-2.5 rounded-xl border border-black/10 bg-[#faf8f3] text-sm" />
+      <button id="btn-send-chat" class="bg-black text-white text-sm font-semibold px-4 rounded-xl">Send</button>
+    </div>
+
+    <!-- Payment request inline form (tailor only) -->
+    <div id="pay-request-form" class="hidden border-t border-black/5 p-4 bg-[#faf8f3] space-y-2">
+      <div class="text-xs font-bold uppercase text-black/60">Request Payment</div>
+      <div class="grid grid-cols-3 gap-2">
+        <input id="pr-amount" type="number" placeholder="Amount ₦" class="col-span-1 px-3 py-2 rounded-lg border border-black/10 text-sm" />
+        <select id="pr-method" class="col-span-2 px-3 py-2 rounded-lg border border-black/10 text-sm bg-white">
+          <option value="bank_transfer">Bank Transfer</option>
+          <option value="paystack_card">Card (Paystack)</option>
+          <option value="ussd">USSD</option>
+          <option value="cash">Cash</option>
+          <option value="installment">Installment Plan</option>
+        </select>
+      </div>
+      <input id="pr-notes" placeholder="Notes (bank details, split, etc.)" class="w-full px-3 py-2 rounded-lg border border-black/10 text-sm" />
+      <div class="flex gap-2">
+        <button id="btn-send-pay-req" class="flex-1 bg-[#c9a227] text-black font-semibold text-sm py-2 rounded-xl">Send Request</button>
+        <button id="btn-cancel-pay-req" class="border border-black/10 text-sm px-4 rounded-xl">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
