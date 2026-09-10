@@ -64,8 +64,23 @@ let useLocal = true;
 if (CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY && window.supabase) {
   try {
     sb = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
-    useLocal = false;
-  } catch (e) { console.warn('Supabase init failed, using local fallback', e); }
+
+    // Verify the client actually has the .auth methods we need.
+    // If not, treat it as broken and fall back to local storage so the
+    // app never gets stuck in a half-initialised state.
+    if (sb && sb.auth && typeof sb.auth.signUp === 'function' && typeof sb.auth.signInWithPassword === 'function') {
+      useLocal = false;
+      console.log('[StitchLuxe] Supabase client OK — connected to real backend');
+    } else {
+      console.warn('[StitchLuxe] Supabase client missing .auth — falling back to LOCAL mode');
+      sb = null;
+      useLocal = true;
+    }
+  } catch (e) {
+    console.warn('[StitchLuxe] Supabase init failed, using local fallback', e);
+    sb = null;
+    useLocal = true;
+  }
 }
 
 /* ---- LocalStorage helpers ---- */
