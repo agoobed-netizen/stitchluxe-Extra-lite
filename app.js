@@ -58,7 +58,7 @@ function toast(msg, type='info') {
 /* =============================================================
    DB ADAPTER — Supabase if configured, else localStorage
    ============================================================= */
-let supabase = null;
+let sb = null;
 let useLocal = true;
 
 if (CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY && window.supabase) {
